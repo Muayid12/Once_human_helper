@@ -4,118 +4,35 @@ import tkinter as tk
 import os
 import sys
 
-
-#-----------------------------------------------------------------calculator------------------------------------------------------------------------------------------
-def open_calculator():
-    def evaluate_expression():
-        try:
-            result = eval(entry_calculator.get())
-            result_text = str(result)
-            entry_calculator.config(state=tk.NORMAL)
-            entry_calculator.delete(0, tk.END)
-            entry_calculator.insert(tk.END, result_text)
-            entry_calculator.config(fg='white')  # Set text color to white
-            entry_calculator.config(state=tk.DISABLED)
-        except Exception:
-            entry_calculator.config(state=tk.NORMAL)
-            entry_calculator.delete(0, tk.END)
-            entry_calculator.insert(tk.END, "Error")
-            entry_calculator.config(fg='red')  # Set text color to red on error
-            entry_calculator.config(state=tk.DISABLED)
-
-    def button_click(value):
-        if entry_calculator.get() == "Error":
-            entry_calculator.config(state=tk.NORMAL)
-            entry_calculator.delete(0, tk.END)
-            entry_calculator.config(fg='black')  # Reset color for new input
-            entry_calculator.config(state=tk.DISABLED)
-        
-        entry_calculator.config(state=tk.NORMAL)
-        current_text = entry_calculator.get()
-        entry_calculator.delete(0, tk.END)
-        entry_calculator.insert(tk.END, current_text + value)
-        entry_calculator.config(fg='black')  # Set color to black for normal input
-        entry_calculator.config(state=tk.DISABLED)
-
-    def clear_entry():
-        entry_calculator.config(state=tk.NORMAL)
-        entry_calculator.delete(0, tk.END)
-        entry_calculator.config(fg='black')  # Reset color
-        entry_calculator.config(state=tk.DISABLED)
-
-    def backspace():
-        entry_calculator.config(state=tk.NORMAL)
-        current_text = entry_calculator.get()
-        entry_calculator.delete(0, tk.END)
-        entry_calculator.insert(tk.END, current_text[:-1])
-        entry_calculator.config(fg='black')  # Reset color
-        entry_calculator.config(state=tk.DISABLED)
-
-    def key_press(event):
-        if entry_calculator.focus_get() == entry_calculator:
-            key = event.char
-            if key in '0123456789+-*/.':
-                button_click(key)
-            elif event.keysym == 'Return':  # Enter key
-                evaluate_expression()
-            elif event.keysym == 'BackSpace':  # Backspace key
-                backspace()
-            elif event.keysym == 'Escape':  # Escape key
-                clear_entry()
-
-    calc_window = tk.Toplevel(window)
-    calc_window.title("Calculator")
-
-    # Load and set the icon
-    app_icon = load_image("appicon1.png")
-    if app_icon:
-        calc_window.iconphoto(False, app_icon)
-    
-    calc_window.resizable(False, False)
-
-    button_font = font.Font(size=16)
-    entry_font = font.Font(size=18)
-    
-    entry_calculator = tk.Entry(calc_window, width=20, borderwidth=2, font=entry_font, fg='black', bg='#f0f0f0', relief='flat', state=tk.DISABLED)
-    entry_calculator.grid(row=0, column=0, columnspan=4, sticky='nsew')
-    entry_calculator.bind("<Button-1>", lambda e: "break")  # Disable mouse clicks
-    entry_calculator.bind("<FocusIn>", lambda e: entry_calculator.focus_set())  # Ensure focus is set correctly
-
-    buttons = [
-        ('7', 1, 0), ('8', 1, 1), ('9', 1, 2), ('/', 1, 3),
-        ('4', 2, 0), ('5', 2, 1), ('6', 2, 2), ('*', 2, 3),
-        ('1', 3, 0), ('2', 3, 1), ('3', 3, 2), ('-', 3, 3),
-        ('0', 4, 0), ('.', 4, 1), ('+', 4, 2), ('=', 4, 3),
-        ('C', 5, 0), ('⌫', 5, 1)  
-    ]
-
-    for (text, row, column) in buttons:
-        if text == '=':
-            button = tk.Button(calc_window, text=text, command=evaluate_expression, font=button_font, bg='#4CAF50', fg='white', relief='flat', bd=1)
-        elif text == 'C':
-            button = tk.Button(calc_window, text=text, command=clear_entry, font=button_font, bg='#f44336', fg='white', relief='flat', bd=1)
-        elif text == '⌫':
-            button = tk.Button(calc_window, text=text, command=backspace, font=button_font, bg='#FFC107', fg='black', relief='flat', bd=1)
-        else:
-            button = tk.Button(calc_window, text=text, command=lambda t=text: button_click(t), font=button_font, bg='#2196F3', fg='white', relief='flat', bd=1)
-        button.grid(row=row, column=column, sticky='nsew')
-
-    # Make backspace button span the width of '.' to '='
-    calc_window.grid_columnconfigure(0, weight=1)
-    calc_window.grid_columnconfigure(1, weight=1)
-    calc_window.grid_columnconfigure(2, weight=1)
-    calc_window.grid_columnconfigure(3, weight=1)
-    calc_window.grid_rowconfigure(5, weight=1)  
-    
-    backspace_button = tk.Button(calc_window, text='⌫', command=backspace, font=button_font, bg='#FFC107', fg='black', relief='flat', bd=1)
-    backspace_button.grid(row=5, column=1, columnspan=3, sticky='nsew')
-
-    clear_button = tk.Button(calc_window, text='C', command=clear_entry, font=button_font, bg='#f44336', fg='white', relief='flat', bd=1)
-    clear_button.grid(row=5, column=0, sticky='nsew')
-
-    calc_window.bind('<KeyPress>', key_press)
-    
-    entry_calculator.focus_set()
+MATERIAL_COSTS = {
+    'Steel Ingot': 0,
+    'Carbon Fiber Fabric': 5,
+    'Refined Part': 5,
+    'Standard Part': 5,
+    'Electronic Part': 5,
+    'Watt': 0,
+    'Bronze Ingot': 0,
+    'Copper Ingot': 0,
+    'Automatic Part': 15,
+    'Adhesive': 0,
+    'Metal Scraps': 0,
+    'Rubbers': 5,
+    'Rubber': 5,
+    'Tungsten Ingot': 0,
+    'Log': 0,
+    'Shabby Fabric': 0,
+    'Aluminum Ingot': 0,
+    'Acid': 10,
+    'Glass': 0,
+    'Battery': 0,
+    'Rusted Part': 0,
+    'Special Plastic': 10,
+    'Wasted Plastic': 0,
+    'Stardust Source': 2,
+    'Fuse': 20,
+    'Copper Ore': 0,
+    'Gravel': 0
+}
 
 #-----------------------------------------------------------------------------------------------------------------------------------------------------------
 def show_formatted_report(report):
@@ -156,9 +73,122 @@ def show_formatted_report(report):
 
     # Define bold tag
     text_widget.tag_configure("bold", font=("Helvetica", 12, "bold"))
+    
+    # Define cost color tag
+    text_widget.tag_configure("cost_color", foreground="blue", font=("Helvetica", 12, "bold"))
+    
+    # Define total cost color tag
+    text_widget.tag_configure("total_color", foreground="green", font=("Helvetica", 12, "bold"))
+    
+    # Define warning color tag
+    text_widget.tag_configure("warning_color", foreground="red", font=("Helvetica", 12, "bold"))
+    
+    # Define red color tag for quantities
+    text_widget.tag_configure("red_color", foreground="red", font=("Helvetica", 12, "bold"))
+    
+    # Define green color tag for x symbol
+    text_widget.tag_configure("green_color", foreground="green", font=("Helvetica", 12, "bold"))
 
+    # Process report to handle cost formatting
+    processed_report = report
+    
     # Insert the report text into the text widget
-    text_widget.insert(tk.END, report)
+    text_widget.insert(tk.END, processed_report)
+    
+    # Apply cost color formatting
+    start_idx = '1.0'
+    while True:
+        start_idx = text_widget.search('[COST]', start_idx, stopindex=tk.END)
+        if not start_idx:
+            break
+        end_tag_start = text_widget.search('[/COST]', start_idx, stopindex=tk.END)
+        if not end_tag_start:
+            break
+        
+        # Remove the tags and apply color
+        text_widget.delete(start_idx, f"{start_idx}+6c")  # Remove [COST]
+        end_tag_start = text_widget.search('[/COST]', start_idx, stopindex=tk.END)
+        text_widget.delete(end_tag_start, f"{end_tag_start}+7c")  # Remove [/COST]
+        
+        # Apply color to the cost number
+        text_widget.tag_add("cost_color", start_idx, end_tag_start)
+        start_idx = end_tag_start
+
+    # Apply total cost color formatting
+    start_idx = '1.0'
+    while True:
+        start_idx = text_widget.search('[TOTAL]', start_idx, stopindex=tk.END)
+        if not start_idx:
+            break
+        end_tag_start = text_widget.search('[/TOTAL]', start_idx, stopindex=tk.END)
+        if not end_tag_start:
+            break
+        
+        # Remove the tags and apply color
+        text_widget.delete(start_idx, f"{start_idx}+7c")  # Remove [TOTAL]
+        end_tag_start = text_widget.search('[/TOTAL]', start_idx, stopindex=tk.END)
+        text_widget.delete(end_tag_start, f"{end_tag_start}+8c")  # Remove [/TOTAL]
+        
+        # Apply color to the total cost
+        text_widget.tag_add("total_color", start_idx, end_tag_start)
+        start_idx = end_tag_start
+
+    # Apply warning color formatting
+    start_idx = '1.0'
+    while True:
+        start_idx = text_widget.search('[WARNING]', start_idx, stopindex=tk.END)
+        if not start_idx:
+            break
+        end_tag_start = text_widget.search('[/WARNING]', start_idx, stopindex=tk.END)
+        if not end_tag_start:
+            break
+        
+        # Remove the tags and apply color
+        text_widget.delete(start_idx, f"{start_idx}+9c")  # Remove [WARNING]
+        end_tag_start = text_widget.search('[/WARNING]', start_idx, stopindex=tk.END)
+        text_widget.delete(end_tag_start, f"{end_tag_start}+10c")  # Remove [/WARNING]
+        
+        # Apply color to the warning text
+        text_widget.tag_add("warning_color", start_idx, end_tag_start)
+        start_idx = end_tag_start
+
+    # Apply red color formatting for quantities
+    start_idx = '1.0'
+    while True:
+        start_idx = text_widget.search('[RED]', start_idx, stopindex=tk.END)
+        if not start_idx:
+            break
+        end_tag_start = text_widget.search('[/RED]', start_idx, stopindex=tk.END)
+        if not end_tag_start:
+            break
+        
+        # Remove the tags and apply color
+        text_widget.delete(start_idx, f"{start_idx}+5c")  # Remove [RED]
+        end_tag_start = text_widget.search('[/RED]', start_idx, stopindex=tk.END)
+        text_widget.delete(end_tag_start, f"{end_tag_start}+6c")  # Remove [/RED]
+        
+        # Apply color to the quantity text
+        text_widget.tag_add("red_color", start_idx, end_tag_start)
+        start_idx = end_tag_start
+
+    # Apply green color formatting for x symbol
+    start_idx = '1.0'
+    while True:
+        start_idx = text_widget.search('[GREEN]', start_idx, stopindex=tk.END)
+        if not start_idx:
+            break
+        end_tag_start = text_widget.search('[/GREEN]', start_idx, stopindex=tk.END)
+        if not end_tag_start:
+            break
+        
+        # Remove the tags and apply color
+        text_widget.delete(start_idx, f"{start_idx}+7c")  # Remove [GREEN]
+        end_tag_start = text_widget.search('[/GREEN]', start_idx, stopindex=tk.END)
+        text_widget.delete(end_tag_start, f"{end_tag_start}+8c")  # Remove [/GREEN]
+        
+        # Apply color to the x symbol
+        text_widget.tag_add("green_color", start_idx, end_tag_start)
+        start_idx = end_tag_start
 
 
     # Detect item names and apply bold formatting
@@ -581,8 +611,10 @@ def calculate_requirements():
 
         for name, obj in instances.items():
             requirements = obj.total_requirements()
-            if any(amount > 0 for amount in requirements.values()):  
-                detailed_report += f"{name} Requirements:\n"
+            if any(amount > 0 for amount in requirements.values()):
+                # Get the quantity for this item
+                quantity = obj.quantity
+                detailed_report += f"{name} [GREEN]X[/GREEN][RED]{quantity}[/RED] Requirements:\n"
                 # Ensure "Watt" is listed at the end
                 items = [item for item in requirements.items() if item[0] != 'Watt']
                 watt = requirements.get('Watt', 0)
@@ -609,12 +641,47 @@ def calculate_requirements():
         detailed_report += "\nOverall Total Requirements:\n"
         total_watt = filtered_totals.pop('Watt', 0)  # Extract 'Watt' if present
 
+        # Separate materials with cost and without cost
+        materials_with_cost = {}
+        materials_without_cost = {}
+        
         for material, amount in filtered_totals.items():
+            cost = MATERIAL_COSTS.get(material, 0)
+            if cost > 0:
+                materials_with_cost[material] = amount
+            else:
+                materials_without_cost[material] = amount
+
+        # Calculate total cost if checkbox is checked
+        total_cost = 0
+        if show_costs_var.get():
+            for material, amount in materials_with_cost.items():
+                cost = MATERIAL_COSTS.get(material, 0)
+                total_cost += amount * cost
+
+        # First show materials with cost
+        for material, amount in materials_with_cost.items():
+            if show_costs_var.get():  # If checkbox is checked, show costs
+                cost = MATERIAL_COSTS.get(material, 0)
+                total = amount * cost
+                detailed_report += f"{material}: {amount} → [COST]{total}[/COST]\n"
+            else:  # If checkbox is unchecked, show simple format
+                detailed_report += f"{material}: {amount}\n"
+
+        # Then show materials without cost
+        for material, amount in materials_without_cost.items():
             detailed_report += f"{material}: {amount}\n"
 
-        # Add Watt last, formatted in red
+        # Add Watt
         if total_watt > 0:
             detailed_report += f"Watt: {total_watt}\n"
+
+        # Add total cost under Watt if checkbox is checked
+        if show_costs_var.get() and total_cost > 0:
+            if total_cost > 20000:
+                detailed_report += f"[TOTAL]Total Cost:[/TOTAL] [COST]{total_cost:,}[/COST] [WARNING]— cannot transfer the full amount[/WARNING]\n"
+            else:
+                detailed_report += f"[TOTAL]Total Cost: {total_cost:,}[/TOTAL]\n"
 
         if detailed_report:
             show_formatted_report(detailed_report)
@@ -652,6 +719,10 @@ window.geometry("1348x785")
 window.configure(bg="#FFFFFF")
 bold_font = font.Font(weight="bold")
 window.title("Once Human Tool Helper By Avery")
+
+# Create checkbox variable for showing costs
+show_costs_var = tk.BooleanVar()
+show_costs_var.set(False)  # Default to not showing costs
 
 # Load images after creating the root window
 app_icon = load_image("appicon1.png")
@@ -750,6 +821,17 @@ for x, y, text in text_labels:
 
 canvas.create_text(395.0, 43.0, anchor="nw", text="Alt Base Materials Calculator ", fill="#FFFFFF", font=("Inter Bold", 40 * -1))
 
+# Add checkbox for showing costs (no text label)
+cost_checkbox = tk.Checkbutton(
+    window, 
+    text="", 
+    variable=show_costs_var,
+    bg="#FFFFFF",
+    activebackground="#FFFFFF",
+    selectcolor="#FFFFFF"
+)
+cost_checkbox.place(x=970, y=660)
+
 # Set up buttons on the window
 if button_image:
     Button(
@@ -758,8 +840,7 @@ if button_image:
         relief="flat"
     ).place(x=375.0, y=634.0, width=588.0, height=85.0)
 
-calc_button = tk.Button(window, text="Open Calculator", command=open_calculator)
-calc_button.place(x=1230, y=50)
+
 
 additional_images = [
     (1045.0, 447.0, "image_10.png"),
