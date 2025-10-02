@@ -24,7 +24,7 @@ MATERIAL_COSTS = {
     'Aluminum Ingot': 0,
     'Acid': 8,
     'Glass': 0,
-    'Battery': 0,
+    'Battery': 500,
     'Rusted Part': 0,
     'Special Plastic': 15,
     'Wasted Plastic': 0,
@@ -718,7 +718,7 @@ window = tk.Tk()
 window.geometry("1348x785")
 window.configure(bg="#FFFFFF")
 bold_font = font.Font(weight="bold")
-window.title("Once Human Tool Helper By Avery")
+window.title("Once Human Tool Helper By Elucards")
 
 # Create checkbox variable for showing costs
 show_costs_var = tk.BooleanVar()
