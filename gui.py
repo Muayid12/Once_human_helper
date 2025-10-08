@@ -890,7 +890,7 @@ text_labels = [
 for x, y, text in text_labels:
     canvas.create_text(x, y, anchor="nw", text=text, fill="#4069D5", font=("Inter Bold", 13))
 
-canvas.create_text(395.0, 43.0, anchor="nw", text="Alt Base Materials Calculator ", fill="#FFFFFF", font=("Inter Bold", 40 * -1))
+canvas.create_text(440.0, 43.0, anchor="nw", text="Alt Base Materials Calculator ", fill="#FFFFFF", font=("Inter Bold", 40 * -1))
 
 # Add checkbox for showing costs (no text label)
 cost_checkbox = tk.Checkbutton(
@@ -973,14 +973,15 @@ def save_character_data(char_name):
         existing_data = []
         if os.path.exists(characters_file):
             with open(characters_file, 'r', encoding='utf-8') as f:
-                content = f.read()
+                content = f.read().strip()
                 # Split by character entries (each starts with "Character:")
-                if content.strip():
+                if content:
                     entries = content.split('\n\nCharacter: ')
                     if entries:
                         # First entry might have "Character: " prefix
                         if entries[0].startswith('Character: '):
-                            existing_data = ['Character: ' + e for e in entries]
+                            existing_data = [entries[0]]
+                            existing_data.extend(['Character: ' + e for e in entries[1:]])
                         else:
                             existing_data = [entries[0]] + ['Character: ' + e for e in entries[1:]]
         
@@ -1006,7 +1007,7 @@ def save_character_data(char_name):
                         level_groups[m_level][m_category].append(name)
                         break
         
-        # Format output
+        # Format output - ensure each memetic line ends with \n
         for level in ["5-15", "20-35", "40-50"]:
             if level in level_groups:
                 for category in ["Gathering", "Building", "Crafting", "Management"]:
@@ -1015,13 +1016,184 @@ def save_character_data(char_name):
                             new_entry += f"Level {level} ({category}): {memetic_name}\n"
         
         # Add new entry
-        existing_data.append(new_entry)
+        existing_data.append(new_entry.strip())  # Strip trailing newline from entry
         
-        # Write back with double newline separation
+        # Write back with double newline separation between entries
         with open(characters_file, 'w', encoding='utf-8') as f:
-            f.write('\n'.join(existing_data))
+            # Join with \n\n and add newline at start and end of file
+            f.write('\n' + '\n\n'.join(existing_data) + '\n')
     except Exception as e:
         messagebox.showerror("Error", f"Failed to save character: {e}")
+
+def detect_and_update_character_display():
+    """Automatically detect character based on selected memetics"""
+    server = server_var.get()
+    
+    # Define character patterns to detect
+    character_patterns = {
+        "Furnace Hero (Manibus)": {
+            "server": "Manibus",
+            "memetics": [
+                "Furnace: Precision Refining",
+                "Electric Furnace: Efficiency Lover",
+                "Furnace: Sintering",
+                "Electric Furnace: Electrolysis"
+            ]
+        },
+        "Furnace Hero (Edream)": {
+            "server": "Edream",
+            "memetics": [
+                "Furnace: Precision Refining",
+                "Furnace: Large Furnace",
+                "Electric Furnace: Efficiency Lover",
+                "Furnace: Chaosium Material Analysis",
+                "Furnace: Sintering",
+                "Electric Furnace: Electrolysis"
+            ]
+        },
+        "Kitchen Hero": {
+            "server": "All",
+            "memetics": [
+                "Stove: Long-Term Storage",
+                "Kitchen Set: Gourmand"
+            ]
+        },
+        "Disassembly Hero": {
+            "server": "All",
+            "memetics": [
+                "Disassembly Bench: Careful Disassembly",
+                "Disassembly Bench: Electronic Recycling"
+            ]
+        },
+        "Electricity Hero (Manibus)": {
+            "server": "Manibus",
+            "memetics": [
+                "Biomass Generator: Sustained Output",
+                "Generator: Electrical Expert",
+                "Hydraulic Generator: One with the Tides",
+                "Deviant Power Generator: Stardust Unleashed"
+            ]
+        },
+        "Electricity Hero (Edream)": {
+            "server": "Edream",
+            "memetics": [
+                "Biomass Generator: Sustained Output",
+                "Generator: Electrical Expert",
+                "Generator: Heat Dissipation",
+                "Biomass Generator: Heat Generator",
+                "Hydraulic Generator: One with the Tides",
+                "Deviant Power Generator: Stardust Unleashed",
+                "Deviant Power Generator: Energy Extraction"
+            ],
+            "priority": 1  # Highest priority
+        },
+        "Biomass Hero": {
+            "server": "Edream",
+            "memetics": [
+                "Biomass Generator: Sustained Output",
+                "Generator: Electrical Expert",
+                "Generator: Heat Dissipation",
+                "Biomass Generator: Heat Generator",
+                "Hydraulic Generator: One with the Tides"
+            ],
+            "priority": 2
+        },
+        "Deviantation Hero": {
+            "server": "Edream",
+            "memetics": [
+                "Hydraulic Generator: One with the Tides",
+                "Deviant Power Generator: Stardust Unleashed",
+                "Deviant Power Generator: Energy Extraction",
+                "Generator: Electrical Expert"
+            ],
+            "priority": 3
+        },
+        "Workbench Hero (Manibus)": {
+            "server": "Manibus",
+            "memetics": [
+                "Supplies Workbench: Ammo Factory",
+                "Supplies Workbench: Healing Boost",
+                "Supplies Workbench: Anti-Armor"
+            ]
+        },
+        "Workbench Hero (Edream)": {
+            "server": "Edream",
+            "memetics": [
+                "Supplies Workbench: Ammo Factory",
+                "Supplies Workbench: Forest Hunter",
+                "Supplies Workbench: Healing Boost",
+                "Supplies Workbench: Anti-Armor"
+            ]
+        }
+    }
+    
+    # Get currently selected memetics
+    current_selections = [name for name, selected in selected_memetics.items() if selected]
+    
+    # Check each character pattern and collect all matches
+    detected_characters = []
+    priority_groups = {}  # Track matches by priority group
+    
+    for char_name, pattern in character_patterns.items():
+        # Check if server matches (pattern server "All" matches any server)
+        if pattern["server"].lower() != "all" and pattern["server"].lower() != server.lower():
+            continue
+        
+        # Check if all memetics are selected
+        all_selected = all(memetic in current_selections for memetic in pattern["memetics"])
+        
+        if all_selected:
+            priority = pattern.get("priority", 0)
+            if priority > 0:
+                # Track priority-based matches separately
+                if priority not in priority_groups:
+                    priority_groups[priority] = []
+                priority_groups[priority].append(char_name)
+            else:
+                # Non-priority matches are always added
+                detected_characters.append(char_name)
+    
+    # Add only the highest priority match from priority groups
+    if priority_groups:
+        highest_priority = min(priority_groups.keys())  # Lower number = higher priority
+        detected_characters.extend(priority_groups[highest_priority])
+    
+    # Update display
+    character_display_text.config(state=tk.NORMAL)
+    character_display_text.delete("1.0", tk.END)
+    
+    if detected_characters:
+        # Clean up names by removing server suffix (Manibus/Edream)
+        clean_names = []
+        for name in detected_characters:
+            clean_name = name.replace(" (Manibus)", "").replace(" (Edream)", "")
+            clean_names.append(clean_name)
+        
+        # Join multiple character names with " + "
+        display_text = " + ".join(clean_names)
+        character_display_text.insert("1.0", display_text)
+        character_display_text.tag_add("center", "1.0", "end")
+        character_display_text.tag_config("center", justify='center')
+    
+    character_display_text.config(state=tk.DISABLED)
+
+def update_character_display(char_name):
+    """Update the character display text widget with character name"""
+    
+    # Enable text widget for editing
+    character_display_text.config(state=tk.NORMAL)
+    character_display_text.delete("1.0", tk.END)
+    
+    # Just display the character name centered
+    if char_name:
+        display_text = char_name
+    else:
+        display_text = ""
+    
+    character_display_text.insert("1.0", display_text)
+    character_display_text.tag_add("center", "1.0", "end")
+    character_display_text.tag_config("center", justify='center')
+    character_display_text.config(state=tk.DISABLED)
 
 def load_character_data(char_name):
     """Load character's selected memetics from file (readable format)"""
@@ -1033,18 +1205,31 @@ def load_character_data(char_name):
             return
         
         with open(characters_file, 'r', encoding='utf-8') as f:
-            content = f.read()
+            content = f.read().strip()
         
-        # Split by character entries
+        if not content:
+            messagebox.showinfo("Info", "No saved characters found!")
+            return
+        
+        # Split by character entries (handle newlines properly)
         entries = content.split('\n\nCharacter: ')
-        if entries and not entries[0].startswith('Character: '):
-            entries = ['Character: ' + e for e in entries]
-        elif entries and entries[0].startswith('Character: '):
-            entries = ['Character: ' + e for e in entries[1:]]
-            entries.insert(0, content.split('\n\nCharacter: ')[0])
+        
+        # Process entries
+        processed_entries = []
+        for i, entry in enumerate(entries):
+            entry = entry.strip()
+            if not entry:
+                continue
+            # Add "Character: " prefix if it's not the first entry or if it doesn't have it
+            if i == 0 and entry.startswith('Character: '):
+                processed_entries.append(entry)
+            elif not entry.startswith('Character: '):
+                processed_entries.append('Character: ' + entry)
+            else:
+                processed_entries.append(entry)
         
         # Find matching character
-        for entry in entries:
+        for entry in processed_entries:
             if not entry.strip():
                 continue
             
@@ -1060,6 +1245,7 @@ def load_character_data(char_name):
                 # Found the character - parse memetics
                 selected_list = []
                 for line in lines[2:]:
+                    line = line.strip()
                     if line.startswith('Level '):
                         # Extract memetic name after ": "
                         if ': ' in line:
@@ -1069,6 +1255,9 @@ def load_character_data(char_name):
                 # Update selected memetics
                 for name in selected_memetics:
                     selected_memetics[name] = name in selected_list
+                
+                # Update character display
+                update_character_display(char_name)
                 
                 # Refresh the display to show selections
                 apply_filter(filter_var.get())
@@ -1095,18 +1284,31 @@ def update_character_list():
     try:
         if os.path.exists(characters_file):
             with open(characters_file, 'r', encoding='utf-8') as f:
-                content = f.read()
+                content = f.read().strip()
             
-            # Split by character entries
+            if not content:
+                character_dropdown['values'] = []
+                return
+            
+            # Split by character entries (handle newlines properly)
             entries = content.split('\n\nCharacter: ')
-            if entries and not entries[0].startswith('Character: '):
-                entries = ['Character: ' + e for e in entries]
-            elif entries and entries[0].startswith('Character: '):
-                entries = ['Character: ' + e for e in entries[1:]]
-                entries.insert(0, content.split('\n\nCharacter: ')[0])
+            
+            # Process entries
+            processed_entries = []
+            for i, entry in enumerate(entries):
+                entry = entry.strip()
+                if not entry:
+                    continue
+                # Add "Character: " prefix if it's not the first entry or if it doesn't have it
+                if i == 0 and entry.startswith('Character: '):
+                    processed_entries.append(entry)
+                elif not entry.startswith('Character: '):
+                    processed_entries.append('Character: ' + entry)
+                else:
+                    processed_entries.append(entry)
             
             # Parse each entry
-            for entry in entries:
+            for entry in processed_entries:
                 if not entry.strip():
                     continue
                 
@@ -1137,7 +1339,7 @@ if main_images[2]:  # image_3.png is at index 2
     canvas2.create_image(674.0, 65.0, image=main_images[2])
 
 # Add title text to canvas2
-canvas2.create_text(400.0, 43.0, anchor="nw", text="Alt Memetic Specializations ", fill="#FFFFFF", font=("Inter Bold", 40 * -1))
+canvas2.create_text(475.0, 43.0, anchor="nw", text="Alt Memetic Specializations ", fill="#FFFFFF", font=("Inter Bold", 40 * -1))
 
 # Server selection frame
 server_frame = tk.Frame(frame2, bg="#F5F5F5", highlightthickness=1, highlightbackground="#CCCCCC")
@@ -1212,19 +1414,43 @@ def load_character():
     else:
         messagebox.showwarning("Warning", "Please select a character name!")
 
+def reset_selections():
+    """Reset all selections - clear character name and all selected memetics"""
+    # Clear character name input
+    character_var.set("")
+    
+    # Clear all memetic selections
+    for name in selected_memetics:
+        selected_memetics[name] = False
+    
+    # Clear character display
+    character_display_text.config(state=tk.NORMAL)
+    character_display_text.delete("1.0", tk.END)
+    character_display_text.config(state=tk.DISABLED)
+    
+    # Refresh the card display to show cleared selections
+    apply_filter(filter_var.get())
+
 save_btn = tk.Button(
     character_frame, text="Save", command=save_character,
     bg="#4CAF50", fg="#FFFFFF", font=("Inter Black", 12),
     borderwidth=0, relief="flat", cursor="hand2"
 )
-save_btn.place(x=360, y=10, width=70, height=30)
+save_btn.place(x=315, y=10, width=60, height=30)
 
 load_btn = tk.Button(
     character_frame, text="Load", command=load_character,
     bg="#2196F3", fg="#FFFFFF", font=("Inter Black", 12),
     borderwidth=0, relief="flat", cursor="hand2"
 )
-load_btn.place(x=440, y=10, width=70, height=30)
+load_btn.place(x=385, y=10, width=60, height=30)
+
+reset_btn = tk.Button(
+    character_frame, text="Reset", command=reset_selections,
+    bg="#FF5722", fg="#FFFFFF", font=("Inter Black", 12),
+    borderwidth=0, relief="flat", cursor="hand2"
+)
+reset_btn.place(x=455, y=10, width=60, height=30)
 
 # Create filter frame
 filter_frame = tk.Frame(frame2, bg="#F5F5F5", highlightthickness=1, highlightbackground="#CCCCCC")
@@ -1310,7 +1536,7 @@ for text, x_pos in filter_buttons_data:
 
 # Create scrollable frame for memetic cards with optimized scrolling
 scroll_canvas = Canvas(frame2, bg="#FFFFFF", highlightthickness=0)
-scroll_canvas.place(x=50, y=200, width=1250, height=480)
+scroll_canvas.place(x=50, y=200, width=1250, height=475)
 
 # Create scrollbar
 scrollbar = tk.Scrollbar(frame2, orient="vertical", command=scroll_canvas.yview)
@@ -1320,6 +1546,24 @@ scroll_canvas.configure(yscrollcommand=scrollbar.set)
 # Create frame inside canvas for cards
 cards_frame = tk.Frame(scroll_canvas, bg="#FFFFFF")
 scroll_canvas.create_window((0, 0), window=cards_frame, anchor="nw")
+
+# Create display frame below cards to show loaded character's memetics
+character_display_frame = tk.Frame(frame2, bg="#F5F5F5", highlightthickness=2, highlightbackground="#CCCCCC")
+character_display_frame.place(x=424, y=690, width=500, height=85)
+
+# Add scrollable text widget for character display
+character_display_text = tk.Text(
+    character_display_frame, 
+    bg="#F5F5F5", 
+    fg="#4069D5", 
+    font=("Inter Bold", 16),
+    height=4,
+    wrap=tk.WORD,
+    borderwidth=0,
+    highlightthickness=0
+)
+character_display_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+character_display_text.config(state=tk.DISABLED)
 
 # Optimize scrolling performance with smoother mousewheel
 def on_mousewheel(event):
@@ -1439,6 +1683,9 @@ def create_memetic_card(parent, name, level, category, row, col):
             info_frame.config(bg="#F5F5F5")
             for child in info_frame.winfo_children():
                 child.config(bg="#F5F5F5")
+        
+        # Automatically detect and update character display
+        detect_and_update_character_display()
     
     # Bind click events to all widgets in the card
     card.bind("<Button-1>", toggle_selection)
