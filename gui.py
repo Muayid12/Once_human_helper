@@ -4,40 +4,117 @@ from tkinter import ttk
 import tkinter as tk
 import os
 import sys
+import re
 from PIL import Image, ImageTk
 
 MATERIAL_COSTS = {
-    'Steel Ingot': 0,
+    'Steel Ingot': 50,
     'Carbon Fiber Fabric': 5,
     'Refined Part': 5,
     'Standard Part': 5,
     'Electronic Part': 5,
     'Watt': 0,
-    'Bronze Ingot': 0,
-    'Copper Ingot': 0,
+    'Bronze Ingot': 40,
+    'Copper Ingot': 20,
     'Automatic Part': 15,
-    'Adhesive': 0,
-    'Metal Scraps': 0,
+    'Adhesive': 5,
+    'Metal Scraps': 5,
     'Rubbers': 5,
     'Rubber': 5,
-    'Tungsten Ingot': 0,
-    'Log': 0,
-    'Shabby Fabric': 0,
-    'Aluminum Ingot': 0,
+    'Tungsten Ingot': 80,
+    'Log': 1,
+    'Shabby Fabric': 5,
+    'Aluminum Ingot': 60,
     'Acid': 8,
-    'Glass': 0,
+    'Glass': 10,
     'Battery': 500,
-    'Rusted Part': 0,
+    'Rusted Part': 5,
     'Special Plastic': 10,
-    'Wasted Plastic': 0,
+    'Wasted Plastic': 5,
     'Stardust Source': 3,
     'Fuse': 20,
-    'Copper Ore': 0,
-    'Gravel': 0
+    'Copper Ore': 3,
+    'Gravel': 1
 }
 
+# Track which materials should show transfer costs (enabled by default for materials with cost > 0)
+SHOW_TRANSFER_FOR = {material: (cost > 0) for material, cost in MATERIAL_COSTS.items()}
+
 #-----------------------------------------------------------------------------------------------------------------------------------------------------------
-def show_formatted_report(report):
+def show_formatted_report(report, show_transfer_button=False, raw_data=None):
+    """Enhanced report window with live updates"""
+    
+    def regenerate_report():
+        """Regenerate the report with current SHOW_TRANSFER_FOR settings"""
+        if not raw_data:
+            return report
+        
+        # Start with item details if available
+        detailed_report = raw_data.get('item_details', '')
+        
+        detailed_report += "\nOverall Total Requirements:\n"
+        filtered_totals = raw_data['filtered_totals'].copy()
+        total_watt = filtered_totals.pop('Watt', 0)
+        show_costs = raw_data['show_costs']
+        
+        # Separate materials based on current SHOW_TRANSFER_FOR settings
+        materials_with_transfer = {}
+        materials_without_transfer = {}
+        
+        for material, amount in filtered_totals.items():
+            if SHOW_TRANSFER_FOR.get(material, False) and MATERIAL_COSTS.get(material, 0) > 0:
+                materials_with_transfer[material] = amount
+            else:
+                materials_without_transfer[material] = amount
+        
+        # Calculate total cost
+        total_cost = 0
+        if show_costs:
+            for material, amount in materials_with_transfer.items():
+                cost = MATERIAL_COSTS.get(material, 0)
+                total_cost += amount * cost
+        
+        # Show materials with transfer cost
+        for material, amount in materials_with_transfer.items():
+            if show_costs:
+                cost = MATERIAL_COSTS.get(material, 0)
+                total = amount * cost
+                detailed_report += f"{material}: {amount} → [COST]{total}[/COST]\n"
+            else:
+                detailed_report += f"{material}: {amount}\n"
+        
+        # Show materials without transfer cost
+        for material, amount in materials_without_transfer.items():
+            detailed_report += f"{material}: {amount}\n"
+        
+        # Add Watt
+        if total_watt > 0:
+            detailed_report += f"Watt: {total_watt}\n"
+        
+        # Add total cost
+        if show_costs and total_cost > 0:
+            if total_cost > 20000:
+                detailed_report += f"[TOTAL]Total Transfer Cost:[/TOTAL] [COST]{total_cost:,}[/COST] [WARNING]— cannot transfer the full amount[/WARNING]\n"
+            else:
+                detailed_report += f"[TOTAL]Total Transfer Cost: {total_cost:,}[/TOTAL]\n"
+        
+        return detailed_report
+    
+    def refresh_display():
+        """Refresh the text display with updated report"""
+        new_report = regenerate_report()
+        text_widget.config(state=tk.NORMAL)
+        text_widget.delete("1.0", tk.END)
+        text_widget.insert(tk.END, new_report)
+        
+        # Reapply all formatting
+        apply_formatting()
+        
+        text_widget.config(state=tk.DISABLED)
+        
+        # Scroll to the bottom (last position)
+        text_widget.see(tk.END)
+    
     def search_text():
         # Clear previous highlights
         text_widget.tag_remove("highlight", "1.0", tk.END)
@@ -55,197 +132,546 @@ def show_formatted_report(report):
             # Highlight all matched text
             text_widget.tag_configure("highlight", background="yellow")
 
-    # Create a new Tkinter window
+    # Create a new Tkinter window with modern gray styling
     report_window = tk.Toplevel(window)
-    report_window.title("Total Requirements Report")
-    report_window.resizable(False, False)
+    report_window.title("📊 Total Requirements Report")
+    report_window.geometry("750x700")
+    report_window.resizable(True, True)
+    report_window.configure(bg="#F3F4F6")
     app_icon = load_image("appicon1.png")
     if app_icon:
         report_window.iconphoto(False, app_icon)
-
-
-
-    # Create a frame for better layout management
-    frame = tk.Frame(report_window)
-    frame.pack(padx=10, pady=10)
-
-    # Create a ScrolledText widget
-    text_widget = scrolledtext.ScrolledText(frame, wrap=tk.WORD, width=60, height=20, font=("Helvetica", 12))
-    text_widget.pack()
-
-    # Define bold tag
-    text_widget.tag_configure("bold", font=("Helvetica", 12, "bold"))
     
-    # Define cost color tag
-    text_widget.tag_configure("cost_color", foreground="blue", font=("Helvetica", 12, "bold"))
+    # Create header frame with gray theme
+    header_frame = tk.Frame(report_window, bg="#374151", height=70)
+    header_frame.pack(fill=tk.X)
+    header_frame.pack_propagate(False)
     
-    # Define total cost color tag
-    text_widget.tag_configure("total_color", foreground="green", font=("Helvetica", 12, "bold"))
+    # Header title
+    header_label = tk.Label(
+        header_frame, 
+        text="📊 Total Requirements Report",
+        bg="#374151",
+        fg="#F9FAFB",
+        font=("Segoe UI", 20, "bold")
+    )
+    header_label.pack(pady=20)
+
+    # Create main content frame with gray theme
+    frame = tk.Frame(report_window, bg="#F3F4F6")
+    frame.pack(padx=20, pady=20, fill=tk.BOTH, expand=True)
+
+    # Create a card-like container for the text widget (don't expand to leave room for buttons)
+    text_container = tk.Frame(frame, bg="#FFFFFF", relief="flat", borderwidth=0)
+    text_container.pack(fill=tk.BOTH, expand=False, pady=(0, 10))
     
-    # Define warning color tag
-    text_widget.tag_configure("warning_color", foreground="red", font=("Helvetica", 12, "bold"))
+    # Add subtle shadow effect with multiple frames
+    shadow_frame = tk.Frame(frame, bg="#D1D5DB", relief="flat")
+    shadow_frame.place(in_=text_container, relx=0.005, rely=0.005, relwidth=1, relheight=1)
+    text_container.lift()
     
-    # Define red color tag for quantities
-    text_widget.tag_configure("red_color", foreground="red", font=("Helvetica", 12, "bold"))
-    
-    # Define green color tag for x symbol
-    text_widget.tag_configure("green_color", foreground="green", font=("Helvetica", 12, "bold"))
+    # Create a ScrolledText widget with enhanced styling (fixed height)
+    text_widget = scrolledtext.ScrolledText(
+        text_container, 
+        wrap=tk.WORD, 
+        width=80, 
+        height=20, 
+        font=("Segoe UI", 12), 
+        bg="#FFFFFF",
+        fg="#1F2937",
+        relief="flat",
+        borderwidth=0,
+        padx=15,
+        pady=15,
+        insertbackground="#3B82F6",
+        selectbackground="#DBEAFE",
+        selectforeground="#1E40AF"
+    )
+    text_widget.pack(fill=tk.BOTH, expand=False, padx=2, pady=2)
 
-    # Process report to handle cost formatting
-    processed_report = report
-    
-    # Insert the report text into the text widget
-    text_widget.insert(tk.END, processed_report)
-    
-    # Apply cost color formatting
-    start_idx = '1.0'
-    while True:
-        start_idx = text_widget.search('[COST]', start_idx, stopindex=tk.END)
-        if not start_idx:
-            break
-        end_tag_start = text_widget.search('[/COST]', start_idx, stopindex=tk.END)
-        if not end_tag_start:
-            break
-        
-        # Remove the tags and apply color
-        text_widget.delete(start_idx, f"{start_idx}+6c")  # Remove [COST]
-        end_tag_start = text_widget.search('[/COST]', start_idx, stopindex=tk.END)
-        text_widget.delete(end_tag_start, f"{end_tag_start}+7c")  # Remove [/COST]
-        
-        # Apply color to the cost number
-        text_widget.tag_add("cost_color", start_idx, end_tag_start)
-        start_idx = end_tag_start
+    # Define tags with larger, more readable fonts
+    text_widget.tag_configure("bold", font=("Segoe UI", 13, "bold"))
+    text_widget.tag_configure("item_header", font=("Segoe UI", 14, "bold"), foreground="#1976D2")
+    text_widget.tag_configure("section_header", font=("Segoe UI", 16, "bold"), foreground="#0D47A1")
+    text_widget.tag_configure("cost_color", foreground="#F59E0B", font=("Segoe UI", 14, "bold"))  # Orange/amber for transfer costs
+    text_widget.tag_configure("total_color", foreground="#059669", font=("Segoe UI", 17, "bold"))  # Green for total transfer cost
+    text_widget.tag_configure("warning_color", foreground="#DC2626", font=("Segoe UI", 13, "bold"))
+    text_widget.tag_configure("red_color", foreground="#D32F2F", font=("Segoe UI", 14, "bold"))
+    text_widget.tag_configure("green_color", foreground="#388E3C", font=("Segoe UI", 14, "bold"))
+    text_widget.tag_configure("highlight", background="#FFEB3B")
+    text_widget.tag_configure("red", foreground="#D32F2F", font=("Segoe UI", 14, "bold"))
+    text_widget.tag_configure("material_name", font=("Segoe UI", 12, "bold"), foreground="#424242")
+    text_widget.tag_configure("number", font=("Segoe UI", 13, "bold"), foreground="#3B82F6")  # Blue for regular numbers
 
-    # Apply total cost color formatting
-    start_idx = '1.0'
-    while True:
-        start_idx = text_widget.search('[TOTAL]', start_idx, stopindex=tk.END)
-        if not start_idx:
-            break
-        end_tag_start = text_widget.search('[/TOTAL]', start_idx, stopindex=tk.END)
-        if not end_tag_start:
-            break
+    def apply_formatting():
+        """Apply all color formatting to the text"""
+        # First apply generic number formatting to all numbers
+        content = text_widget.get('1.0', tk.END)
+        lines = content.split('\n')
+        for line_num, line in enumerate(lines, start=1):
+            for match in re.finditer(r'\b(\d+(?:,\d{3})*(?:\.\d+)?)\b', line):
+                col_start = match.start()
+                col_end = match.end()
+                start_pos = f"{line_num}.{col_start}"
+                end_pos = f"{line_num}.{col_end}"
+                text_widget.tag_add('number', start_pos, end_pos)
         
-        # Remove the tags and apply color
-        text_widget.delete(start_idx, f"{start_idx}+7c")  # Remove [TOTAL]
-        end_tag_start = text_widget.search('[/TOTAL]', start_idx, stopindex=tk.END)
-        text_widget.delete(end_tag_start, f"{end_tag_start}+8c")  # Remove [/TOTAL]
-        
-        # Apply color to the total cost
-        text_widget.tag_add("total_color", start_idx, end_tag_start)
-        start_idx = end_tag_start
-
-    # Apply warning color formatting
-    start_idx = '1.0'
-    while True:
-        start_idx = text_widget.search('[WARNING]', start_idx, stopindex=tk.END)
-        if not start_idx:
-            break
-        end_tag_start = text_widget.search('[/WARNING]', start_idx, stopindex=tk.END)
-        if not end_tag_start:
-            break
-        
-        # Remove the tags and apply color
-        text_widget.delete(start_idx, f"{start_idx}+9c")  # Remove [WARNING]
-        end_tag_start = text_widget.search('[/WARNING]', start_idx, stopindex=tk.END)
-        text_widget.delete(end_tag_start, f"{end_tag_start}+10c")  # Remove [/WARNING]
-        
-        # Apply color to the warning text
-        text_widget.tag_add("warning_color", start_idx, end_tag_start)
-        start_idx = end_tag_start
-
-    # Apply red color formatting for quantities
-    start_idx = '1.0'
-    while True:
-        start_idx = text_widget.search('[RED]', start_idx, stopindex=tk.END)
-        if not start_idx:
-            break
-        end_tag_start = text_widget.search('[/RED]', start_idx, stopindex=tk.END)
-        if not end_tag_start:
-            break
-        
-        # Remove the tags and apply color
-        text_widget.delete(start_idx, f"{start_idx}+5c")  # Remove [RED]
-        end_tag_start = text_widget.search('[/RED]', start_idx, stopindex=tk.END)
-        text_widget.delete(end_tag_start, f"{end_tag_start}+6c")  # Remove [/RED]
-        
-        # Apply color to the quantity text
-        text_widget.tag_add("red_color", start_idx, end_tag_start)
-        start_idx = end_tag_start
-
-    # Apply green color formatting for x symbol
-    start_idx = '1.0'
-    while True:
-        start_idx = text_widget.search('[GREEN]', start_idx, stopindex=tk.END)
-        if not start_idx:
-            break
-        end_tag_start = text_widget.search('[/GREEN]', start_idx, stopindex=tk.END)
-        if not end_tag_start:
-            break
-        
-        # Remove the tags and apply color
-        text_widget.delete(start_idx, f"{start_idx}+7c")  # Remove [GREEN]
-        end_tag_start = text_widget.search('[/GREEN]', start_idx, stopindex=tk.END)
-        text_widget.delete(end_tag_start, f"{end_tag_start}+8c")  # Remove [/GREEN]
-        
-        # Apply color to the x symbol
-        text_widget.tag_add("green_color", start_idx, end_tag_start)
-        start_idx = end_tag_start
-
-
-    # Detect item names and apply bold formatting
-    item_names = [
-        "Stardust Mining", "Water Pump", "Requirements:", "Osmosis Water Purifier",
-        "Super Refinery", "Rainwater", "Small Water Pump", "Brewing Barrel",
-        "Water Tank", "Securement", "Normal Refinery", "Furnace", "Blue Light",
-        "Radio", "ADVHydraulic", "ADVBiomass", "Deviation", "Overall Total", "Watt"
-    ]
-
-    start_idx = '1.0'
-    while True:
-        start_idx = text_widget.search('Watt', start_idx, nocase=True, stopindex=tk.END)
-        if not start_idx:
-            break
-        end_idx = f"{start_idx}+4c"  # Length of 'Watt' is 4 characters
-        text_widget.tag_add('red', start_idx, end_idx)
-        start_idx = end_idx
-
-    # Define the red color tag
-    text_widget.tag_config('red', foreground='red')
-
-    for item in item_names:
-        start_idx = "1.0"
+        # Apply cost color formatting (will override number tag)
+        start_idx = '1.0'
         while True:
-            start_idx = text_widget.search(item, start_idx, nocase=tk.TRUE, stopindex=tk.END)
+            start_idx = text_widget.search('[COST]', start_idx, stopindex=tk.END)
             if not start_idx:
                 break
-            end_idx = f"{start_idx}+{len(item)}c"
-            text_widget.tag_add("bold", start_idx, end_idx)
+            end_tag_start = text_widget.search('[/COST]', start_idx, stopindex=tk.END)
+            if not end_tag_start:
+                break
+            
+            # Remove the tags and apply color
+            text_widget.delete(start_idx, f"{start_idx}+6c")
+            end_tag_start = text_widget.search('[/COST]', start_idx, stopindex=tk.END)
+            text_widget.delete(end_tag_start, f"{end_tag_start}+7c")
+            
+            # Apply color to the cost number (higher priority than number tag)
+            text_widget.tag_remove("number", start_idx, end_tag_start)
+            text_widget.tag_add("cost_color", start_idx, end_tag_start)
+            start_idx = end_tag_start
+
+        # Apply total cost color formatting (will override number tag)
+        start_idx = '1.0'
+        while True:
+            start_idx = text_widget.search('[TOTAL]', start_idx, stopindex=tk.END)
+            if not start_idx:
+                break
+            end_tag_start = text_widget.search('[/TOTAL]', start_idx, stopindex=tk.END)
+            if not end_tag_start:
+                break
+            
+            # Remove the tags and apply color
+            text_widget.delete(start_idx, f"{start_idx}+7c")
+            end_tag_start = text_widget.search('[/TOTAL]', start_idx, stopindex=tk.END)
+            text_widget.delete(end_tag_start, f"{end_tag_start}+8c")
+            
+            # Apply color to the total cost (higher priority than number tag)
+            text_widget.tag_remove("number", start_idx, end_tag_start)
+            text_widget.tag_add("total_color", start_idx, end_tag_start)
+            start_idx = end_tag_start
+
+        # Apply warning color formatting
+        start_idx = '1.0'
+        while True:
+            start_idx = text_widget.search('[WARNING]', start_idx, stopindex=tk.END)
+            if not start_idx:
+                break
+            end_tag_start = text_widget.search('[/WARNING]', start_idx, stopindex=tk.END)
+            if not end_tag_start:
+                break
+            
+            # Remove the tags and apply color
+            text_widget.delete(start_idx, f"{start_idx}+9c")
+            end_tag_start = text_widget.search('[/WARNING]', start_idx, stopindex=tk.END)
+            text_widget.delete(end_tag_start, f"{end_tag_start}+10c")
+            
+            # Apply color to the warning text
+            text_widget.tag_add("warning_color", start_idx, end_tag_start)
+            start_idx = end_tag_start
+
+        # Apply red color formatting for quantities
+        start_idx = '1.0'
+        while True:
+            start_idx = text_widget.search('[RED]', start_idx, stopindex=tk.END)
+            if not start_idx:
+                break
+            end_tag_start = text_widget.search('[/RED]', start_idx, stopindex=tk.END)
+            if not end_tag_start:
+                break
+            
+            # Remove the tags and apply color
+            text_widget.delete(start_idx, f"{start_idx}+5c")
+            end_tag_start = text_widget.search('[/RED]', start_idx, stopindex=tk.END)
+            text_widget.delete(end_tag_start, f"{end_tag_start}+6c")
+            
+            # Apply color to the quantity text
+            text_widget.tag_add("red_color", start_idx, end_tag_start)
+            start_idx = end_tag_start
+
+        # Apply green color formatting for x symbol
+        start_idx = '1.0'
+        while True:
+            start_idx = text_widget.search('[GREEN]', start_idx, stopindex=tk.END)
+            if not start_idx:
+                break
+            end_tag_start = text_widget.search('[/GREEN]', start_idx, stopindex=tk.END)
+            if not end_tag_start:
+                break
+            
+            # Remove the tags and apply color
+            text_widget.delete(start_idx, f"{start_idx}+7c")
+            end_tag_start = text_widget.search('[/GREEN]', start_idx, stopindex=tk.END)
+            text_widget.delete(end_tag_start, f"{end_tag_start}+8c")
+            
+            # Apply color to the x symbol
+            text_widget.tag_add("green_color", start_idx, end_tag_start)
+            start_idx = end_tag_start
+
+        # Apply special formatting for "Overall Total Requirements" header
+        start_idx = '1.0'
+        while True:
+            start_idx = text_widget.search('Overall Total Requirements', start_idx, stopindex=tk.END)
+            if not start_idx:
+                break
+            end_idx = f"{start_idx}+26c"
+            text_widget.tag_add('section_header', start_idx, end_idx)
             start_idx = end_idx
-
-    # Make the text widget read-only
-    text_widget.config(state=tk.DISABLED)
-
-    # Create a search bar and button
-    search_frame = tk.Frame(frame)
-    search_frame.pack(pady=5, fill=tk.X)
-
+        
+        # Apply special formatting for item headers
+        item_names = [
+            "Stardust Mining", "Water Pump", "Osmosis Water Purifier",
+            "Super Refinery", "Rainwater", "Small Water Pump", "Brewing Barrel",
+            "Water Tank", "Securement", "Normal Refinery", "Furnace", "Blue Light",
+            "Radio", "ADVHydraulic", "ADVBiomass", "Deviation"
+        ]
+        
+        for item in item_names:
+            start_idx = "1.0"
+            while True:
+                start_idx = text_widget.search(item, start_idx, stopindex=tk.END)
+                if not start_idx:
+                    break
+                line_end = text_widget.index(f"{start_idx} lineend")
+                line_text = text_widget.get(start_idx, line_end)
+                if " Requirements:" in line_text or "Requirements:" in line_text:
+                    text_widget.tag_add("item_header", start_idx, line_end)
+                start_idx = f"{start_idx}+1c"
+        
+        # Bold material names in the overall section
+        start_idx = '1.0'
+        overall_start = text_widget.search('Overall Total Requirements', '1.0', stopindex=tk.END)
+        if overall_start:
+            search_start = f"{overall_start}+1l"
+            current_idx = search_start
+            while True:
+                current_idx = text_widget.search(':', current_idx, stopindex=tk.END)
+                if not current_idx:
+                    break
+                line_start = text_widget.index(f"{current_idx} linestart")
+                line_text = text_widget.get(line_start, current_idx)
+                
+                if "Watt" not in line_text:
+                    text_widget.tag_add("material_name", line_start, current_idx)
+                current_idx = f"{current_idx}+1c"
+        
+        # Make "Watt" stand out in red
+        start_idx = '1.0'
+        while True:
+            start_idx = text_widget.search('Watt:', start_idx, stopindex=tk.END)
+            if not start_idx:
+                break
+            end_idx = f"{start_idx}+5c"
+            text_widget.tag_remove("material_name", start_idx, end_idx)
+            text_widget.tag_add('red', start_idx, end_idx)
+            start_idx = end_idx
     
-    search_entry = tk.Entry(search_frame, width=30)
-    search_entry.pack(side=tk.LEFT, padx=5)
+    # Insert initial report (do this later after creating all UI elements)
+    # We'll insert and format the text after defining all functions
     
-    search_button = tk.Button(search_frame, text="Search", command=search_text)
-    search_button.pack(side=tk.LEFT)
-
-    # Add an OK button to close the window
+    # Create a modern search bar with gray theme
+    search_frame = tk.Frame(frame, bg="#F3F4F6")
+    search_frame.pack(pady=(0, 10), fill=tk.X)
+    
+    # Search icon label
+    search_icon = tk.Label(
+        search_frame,
+        text="🔍",
+        bg="#F3F4F6",
+        font=("Segoe UI", 12)
+    )
+    search_icon.pack(side=tk.LEFT, padx=(0, 5))
+    
+    # Modern search entry
+    search_entry = tk.Entry(
+        search_frame, 
+        width=35,
+        font=("Segoe UI", 11),
+        bg="#FFFFFF",
+        fg="#1F2937",
+        relief="solid",
+        borderwidth=1,
+        insertbackground="#6B7280"
+    )
+    search_entry.pack(side=tk.LEFT, padx=5, ipady=5)
+    
+    # Modern search button with gray theme
+    search_button = tk.Button(
+        search_frame, 
+        text="Search", 
+        command=search_text,
+        bg="#6B7280",
+        fg="#FFFFFF",
+        font=("Segoe UI", 10, "bold"),
+        relief="flat",
+        borderwidth=0,
+        cursor="hand2",
+        padx=20,
+        pady=5
+    )
+    search_button.pack(side=tk.LEFT, padx=5)
+    
+    # Hover effect for search button
+    def on_enter_search(e):
+        search_button['bg'] = '#4B5563'
+    
+    def on_leave_search(e):
+        search_button['bg'] = '#6B7280'
+    
+    search_button.bind("<Enter>", on_enter_search)
+    search_button.bind("<Leave>", on_leave_search)
+    
+    # Function to open material transfer selection dialog
+    def open_transfer_selection():
+        """Open dialog to select which materials should show transfer costs"""
+        dialog = tk.Toplevel(report_window)
+        dialog.title("⚙ Transfer Cost Settings")
+        dialog.geometry("500x600")
+        dialog.resizable(False, False)
+        dialog.configure(bg="#F3F4F6")
+        
+        if app_icon:
+            dialog.iconphoto(False, app_icon)
+        
+        # Gray themed header frame
+        header_frame = tk.Frame(dialog, bg="#4B5563", height=70)
+        header_frame.pack(fill="x")
+        header_frame.pack_propagate(False)
+        
+        tk.Label(
+            header_frame, 
+            text="⚙  Transfer Cost Settings", 
+            bg="#4B5563", 
+            fg="#F9FAFB",
+            font=("Segoe UI", 16, "bold")
+        ).pack(pady=22)
+        
+        # Modern instructions with icon
+        instructions_frame = tk.Frame(dialog, bg="#F3F4F6")
+        instructions_frame.pack(pady=15, padx=20)
+        
+        tk.Label(
+            instructions_frame, 
+            text="💡 Select which materials should show transfer costs:",
+            bg="#F3F4F6", 
+            fg="#374151",
+            font=("Segoe UI", 11)
+        ).pack()
+        
+        # Create frame for scrollable content with card design
+        content_frame = tk.Frame(dialog, bg="#F3F4F6")
+        content_frame.pack(fill="both", expand=True, padx=25, pady=(0, 15))
+        
+        # Card container for list
+        card_frame = tk.Frame(content_frame, bg="#FFFFFF", relief="flat")
+        card_frame.pack(fill="both", expand=True)
+        
+        # Create scrollable frame
+        canvas_dialog = tk.Canvas(card_frame, bg="#FFFFFF", highlightthickness=0)
+        scrollbar_dialog = tk.Scrollbar(card_frame, orient="vertical", command=canvas_dialog.yview)
+        scrollable_frame = tk.Frame(canvas_dialog, bg="#FFFFFF")
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas_dialog.configure(scrollregion=canvas_dialog.bbox("all"))
+        )
+        
+        canvas_dialog.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas_dialog.configure(yscrollcommand=scrollbar_dialog.set)
+        
+        canvas_dialog.pack(side="left", fill="both", expand=True)
+        scrollbar_dialog.pack(side="right", fill="y")
+        
+        # Create modern checkboxes for each material with a cost
+        checkbox_vars = {}
+        for i, (material, cost) in enumerate(sorted(MATERIAL_COSTS.items())):
+            if cost > 0:  # Only show materials that have a transfer cost
+                var = tk.BooleanVar(value=SHOW_TRANSFER_FOR.get(material, False))
+                checkbox_vars[material] = var
+                
+                # Alternating row colors for better readability
+                row_bg = "#F9FAFB" if i % 2 == 0 else "#FFFFFF"
+                
+                # Create a frame for each checkbox item
+                item_frame = tk.Frame(scrollable_frame, bg=row_bg)
+                item_frame.pack(fill="x", pady=1, padx=0)
+                
+                # Checkbox with material name
+                cb = tk.Checkbutton(
+                    item_frame,
+                    text=f"  {material}",
+                    variable=var,
+                    bg=row_bg,
+                    activebackground=row_bg,
+                    font=("Segoe UI", 10),
+                    cursor="hand2",
+                    selectcolor="#FFFFFF"
+                )
+                cb.pack(side="left", padx=15, pady=8)
+                
+                # Cost badge
+                cost_label = tk.Label(
+                    item_frame, 
+                    text=f"{cost} per unit", 
+                    bg=row_bg, 
+                    fg="#6B7280",
+                    font=("Segoe UI", 9)
+                )
+                cost_label.pack(side="left", padx=5)
+        
+        # Modern button frame with separator
+        separator_dialog = tk.Frame(dialog, bg="#E5E7EB", height=1)
+        separator_dialog.pack(fill="x", pady=(15, 0))
+        
+        button_frame = tk.Frame(dialog, bg="#F3F4F6")
+        button_frame.pack(fill="x", padx=25, pady=20)
+        
+        # Save button
+        def save_selection():
+            for material, var in checkbox_vars.items():
+                SHOW_TRANSFER_FOR[material] = var.get()
+            # Save settings to file
+            save_transfer_settings()
+            dialog.destroy()
+            # Live update the report
+            if raw_data:
+                refresh_display()
+        
+        # Cancel button
+        def cancel_selection():
+            dialog.destroy()
+        
+        # Gray themed Save button
+        save_btn = tk.Button(
+            button_frame, 
+            text="✓  Save Changes", 
+            command=save_selection,
+            bg="#4B5563",
+            fg="#FFFFFF",
+            font=("Segoe UI", 11, "bold"),
+            borderwidth=0,
+            relief="flat",
+            cursor="hand2",
+            padx=30,
+            pady=10
+        )
+        save_btn.pack(side="left", padx=5)
+        
+        # Hover effect for save button
+        def on_enter_save(e):
+            save_btn['bg'] = '#374151'
+        
+        def on_leave_save(e):
+            save_btn['bg'] = '#4B5563'
+        
+        save_btn.bind("<Enter>", on_enter_save)
+        save_btn.bind("<Leave>", on_leave_save)
+        
+        # Gray themed Cancel button
+        cancel_btn = tk.Button(
+            button_frame, 
+            text="✕  Cancel", 
+            command=cancel_selection,
+            bg="#9CA3AF",
+            fg="#FFFFFF",
+            font=("Segoe UI", 11, "bold"),
+            borderwidth=0,
+            relief="flat",
+            cursor="hand2",
+            padx=30,
+            pady=10
+        )
+        cancel_btn.pack(side="left", padx=5)
+        
+        # Hover effect for cancel button
+        def on_enter_cancel(e):
+            cancel_btn['bg'] = '#6B7280'
+        
+        def on_leave_cancel(e):
+            cancel_btn['bg'] = '#9CA3AF'
+        
+        cancel_btn.bind("<Enter>", on_enter_cancel)
+        cancel_btn.bind("<Leave>", on_leave_cancel)
+    
+    # Gray themed buttons frame with separator
+    separator = tk.Frame(frame, bg="#E5E7EB", height=1)
+    separator.pack(fill=tk.X, pady=(0, 15))
+    
+    buttons_frame = tk.Frame(frame, bg="#F3F4F6")
+    buttons_frame.pack(pady=0)
+    
+    # Close window function
     def close_window():
         report_window.destroy()
+    
+    # Transfer Settings button - only show if checkbox was ticked (gray theme)
+    if show_transfer_button:
+        transfer_btn = tk.Button(
+            buttons_frame, 
+            text="⚙  Transfer Settings", 
+            command=open_transfer_selection,
+            bg="#6B7280",
+            fg="#FFFFFF",
+            font=("Segoe UI", 11, "bold"),
+            borderwidth=0,
+            relief="flat",
+            cursor="hand2",
+            padx=25,
+            pady=10
+        )
+        transfer_btn.pack(side=tk.LEFT, padx=8)
+        
+        # Hover effects for transfer button
+        def on_enter_transfer(e):
+            transfer_btn['bg'] = '#4B5563'
+        
+        def on_leave_transfer(e):
+            transfer_btn['bg'] = '#6B7280'
+        
+        transfer_btn.bind("<Enter>", on_enter_transfer)
+        transfer_btn.bind("<Leave>", on_leave_transfer)
 
-    ok_button = tk.Button(frame, text="OK", command=close_window)
-    ok_button.pack(pady=5)
+    # Close button with gray theme
+    ok_button = tk.Button(
+        buttons_frame, 
+        text="✓  Close", 
+        command=close_window,
+        bg="#4B5563",
+        fg="#FFFFFF",
+        font=("Segoe UI", 11, "bold"),
+        borderwidth=0,
+        relief="flat",
+        cursor="hand2",
+        padx=25,
+        pady=10
+    )
+    ok_button.pack(side=tk.LEFT, padx=8)
+    
+    # Hover effects for Close button
+    def on_enter_ok(e):
+        ok_button['bg'] = '#374151'
+    
+    def on_leave_ok(e):
+        ok_button['bg'] = '#4B5563'
+    
+    ok_button.bind("<Enter>", on_enter_ok)
+    ok_button.bind("<Leave>", on_leave_ok)
+    
+    # Now insert and format the report text
+    text_widget.config(state=tk.NORMAL)
+    text_widget.insert(tk.END, report)
+    apply_formatting()
+    text_widget.config(state=tk.DISABLED)
+    
+    # Scroll to the bottom (last position)
+    text_widget.see(tk.END)
 
     # Start the Tkinter event loop
-    
     report_window.mainloop()
 
 # objects
@@ -639,30 +1065,33 @@ def calculate_requirements():
                 detailed_report += "\n"
 
         filtered_totals = {k: v for k, v in combined_totals.items() if v > 0}
+        
+        # Save the item details part before adding overall
+        item_details_report = detailed_report
 
         detailed_report += "\nOverall Total Requirements:\n"
         total_watt = filtered_totals.pop('Watt', 0)  # Extract 'Watt' if present
 
-        # Separate materials with cost and without cost
-        materials_with_cost = {}
-        materials_without_cost = {}
+        # Separate materials that should show transfer cost from those that shouldn't
+        materials_with_transfer = {}
+        materials_without_transfer = {}
         
         for material, amount in filtered_totals.items():
-            cost = MATERIAL_COSTS.get(material, 0)
-            if cost > 0:
-                materials_with_cost[material] = amount
+            # Check if this material should show transfer cost
+            if SHOW_TRANSFER_FOR.get(material, False) and MATERIAL_COSTS.get(material, 0) > 0:
+                materials_with_transfer[material] = amount
             else:
-                materials_without_cost[material] = amount
+                materials_without_transfer[material] = amount
 
         # Calculate total cost if checkbox is checked
         total_cost = 0
         if show_costs_var.get():
-            for material, amount in materials_with_cost.items():
+            for material, amount in materials_with_transfer.items():
                 cost = MATERIAL_COSTS.get(material, 0)
                 total_cost += amount * cost
 
-        # First show materials with cost
-        for material, amount in materials_with_cost.items():
+        # First show materials with transfer cost
+        for material, amount in materials_with_transfer.items():
             if show_costs_var.get():  # If checkbox is checked, show costs
                 cost = MATERIAL_COSTS.get(material, 0)
                 total = amount * cost
@@ -670,8 +1099,8 @@ def calculate_requirements():
             else:  # If checkbox is unchecked, show simple format
                 detailed_report += f"{material}: {amount}\n"
 
-        # Then show materials without cost
-        for material, amount in materials_without_cost.items():
+        # Then show materials without transfer cost
+        for material, amount in materials_without_transfer.items():
             detailed_report += f"{material}: {amount}\n"
 
         # Add Watt
@@ -686,7 +1115,17 @@ def calculate_requirements():
                 detailed_report += f"[TOTAL]Total Transfer Cost: {total_cost:,}[/TOTAL]\n"
 
         if detailed_report:
-            show_formatted_report(detailed_report)
+            # Prepare raw data for live updates
+            raw_data = {
+                'filtered_totals': filtered_totals.copy(),
+                'show_costs': show_costs_var.get(),
+                'item_details': item_details_report  # Include individual item requirements
+            }
+            # Add Watt back to filtered_totals for raw_data
+            if total_watt > 0:
+                raw_data['filtered_totals']['Watt'] = total_watt
+            
+            show_formatted_report(detailed_report, show_transfer_button=show_costs_var.get(), raw_data=raw_data)
         else:
             tk.messagebox.showinfo("Total Requirements", "No requirements to show.")
 
@@ -715,10 +1154,45 @@ def load_image(image_path):
         print(f"Error loading image {image_path}: {e}")
         return None
 
+# Function to load transfer settings from file
+def load_transfer_settings():
+    """Load transfer settings from assets/transfer_settings.txt"""
+    settings_file = relative_to_assets("transfer_settings.txt")
+    try:
+        if os.path.exists(settings_file):
+            with open(settings_file, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if '=' in line and not line.startswith('#'):
+                        material, value = line.split('=', 1)
+                        material = material.strip()
+                        value = value.strip().lower()
+                        if material in SHOW_TRANSFER_FOR:
+                            SHOW_TRANSFER_FOR[material] = (value == 'true')
+    except Exception as e:
+        print(f"Error loading transfer settings: {e}")
+
+# Function to save transfer settings to file
+def save_transfer_settings():
+    """Save transfer settings to assets/transfer_settings.txt"""
+    settings_file = relative_to_assets("transfer_settings.txt")
+    try:
+        with open(settings_file, 'w') as f:
+            f.write("# Transfer Cost Settings\n")
+            f.write("# Format: Material Name = true/false\n\n")
+            for material in sorted(SHOW_TRANSFER_FOR.keys()):
+                if MATERIAL_COSTS.get(material, 0) > 0:  # Only save materials with costs
+                    f.write(f"{material} = {str(SHOW_TRANSFER_FOR[material]).lower()}\n")
+    except Exception as e:
+        print(f"Error saving transfer settings: {e}")
+
 window = tk.Tk()
 window.geometry("1348x785")
 window.configure(bg="#FFFFFF")
 window.title("Once Human Tool Helper By Brëakdown")
+
+# Load transfer settings from file
+load_transfer_settings()
 
 # Hide window during loading for smoother startup
 window.withdraw()
