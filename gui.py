@@ -1,8 +1,10 @@
 from pathlib import Path
 from tkinter import Canvas, Entry, Button, PhotoImage, font,scrolledtext , messagebox
+from tkinter import ttk
 import tkinter as tk
 import os
 import sys
+from PIL import Image, ImageTk
 
 MATERIAL_COSTS = {
     'Steel Ingot': 0,
@@ -26,7 +28,7 @@ MATERIAL_COSTS = {
     'Glass': 0,
     'Battery': 500,
     'Rusted Part': 0,
-    'Special Plastic': 15,
+    'Special Plastic': 10,
     'Wasted Plastic': 0,
     'Stardust Source': 3,
     'Fuse': 20,
@@ -702,29 +704,32 @@ def relative_to_assets(path):
     else:
         # If running in a normal Python environment
         base_path = Path(__file__).parent
-    return str(Path(base_path) / path)
+    return str(Path(base_path) / "assets" / path)
 
 def load_image(image_path):
-    """Load an image from a path."""
+    """Load an image from a path with caching."""
     try:
         image = PhotoImage(file=relative_to_assets(image_path))
         return image
     except Exception as e:
-        tk.messagebox.showerror(f"Error loading image {image_path}: {e}")
-        print(f"Exception: {e}")  # Debugging statement
+        print(f"Error loading image {image_path}: {e}")
         return None
 
 window = tk.Tk()
 window.geometry("1348x785")
 window.configure(bg="#FFFFFF")
+window.title("Once Human Tool Helper By Avery")
+
+# Hide window during loading for smoother startup
+window.withdraw()
+
 bold_font = font.Font(weight="bold")
-window.title("Once Human Tool Helper By Elucards")
 
 # Create checkbox variable for showing costs
 show_costs_var = tk.BooleanVar()
 show_costs_var.set(False)  # Default to not showing costs
 
-# Load images after creating the root window
+# Load images after creating the root window (optimized loading)
 app_icon = load_image("appicon1.png")
 main_images = [load_image(f"image_{i}.png") for i in range(1, 18)]
 entry_images = [load_image(f"entry_{i}.png") for i in range(1, 17)]
@@ -735,8 +740,70 @@ button_image = load_image("button_1.png")
 if app_icon:
     window.iconphoto(False, app_icon)
 
+# Create frames for different pages
+frame1 = tk.Frame(window, bg="#FFFFFF")
+frame2 = tk.Frame(window, bg="#FFFFFF")
+
+# Animation function for smooth transitions
+def animate_transition(from_frame, to_frame, direction='right'):
+    """Animate transition between frames with slide effect"""
+    # Determine slide direction
+    if direction == 'right':
+        start_x = 1348  # Start from right
+        end_x = 0
+        from_end_x = -1348  # Exit to left
+    else:  # left
+        start_x = -1348  # Start from left
+        end_x = 0
+        from_end_x = 1348  # Exit to right
+    
+    # Raise the to_frame to be on top
+    to_frame.lift()
+    
+    # Place both frames
+    from_frame.place(x=0, y=0, width=1348, height=785)
+    to_frame.place(x=start_x, y=0, width=1348, height=785)
+    
+    # Animation parameters - faster transition
+    steps = 10  # Number of animation steps (reduced for faster animation)
+    delay = 8  # Milliseconds between steps (reduced for faster animation)
+    
+    def slide_step(step):
+        if step <= steps:
+            # Calculate positions
+            progress = step / steps
+            to_x = start_x + (end_x - start_x) * progress
+            from_x = 0 + (from_end_x - 0) * progress
+            
+            # Update positions
+            to_frame.place(x=int(to_x), y=0, width=1348, height=785)
+            from_frame.place(x=int(from_x), y=0, width=1348, height=785)
+            
+            # Schedule next step
+            window.after(delay, lambda: slide_step(step + 1))
+        else:
+            # Animation complete - clean up
+            from_frame.place_forget()
+            to_frame.place(x=0, y=0, width=1348, height=785)
+            to_frame.lift()
+    
+    # Start animation
+    slide_step(0)
+
+# Function to show frame 1
+def show_frame1():
+    animate_transition(frame2, frame1, direction='left')
+
+# Function to show frame 2
+def show_frame2():
+    animate_transition(frame1, frame2, direction='right')
+
+# Initially show frame 1
+frame1.place(x=0, y=0, width=1348, height=785)
+
+# ===== FRAME 1 CONTENT =====
 canvas = Canvas(
-    window, bg="#FFFFFF", height=785, width=1348, bd=0,
+    frame1, bg="#FFFFFF", height=785, width=1348, bd=0,
     highlightthickness=0, relief="ridge"
 )
 canvas.place(x=0, y=0)
@@ -787,6 +854,7 @@ entry_positions = [
 
 entry_widgets = []  # List to keep references to entry widgets
 
+# Create entry backgrounds and widgets together
 for x, y, img in entry_positions:
     if img:
         canvas.create_image(x, y, image=img)
@@ -823,7 +891,7 @@ canvas.create_text(395.0, 43.0, anchor="nw", text="Alt Base Materials Calculator
 
 # Add checkbox for showing costs (no text label)
 cost_checkbox = tk.Checkbutton(
-    window, 
+    frame1, 
     text="", 
     variable=show_costs_var,
     bg="#FFFFFF",
@@ -832,13 +900,42 @@ cost_checkbox = tk.Checkbutton(
 )
 cost_checkbox.place(x=970, y=660)
 
-# Set up buttons on the window
+# Set up buttons on frame1
 if button_image:
     Button(
-        window, image=button_image, borderwidth=0,
+        frame1, image=button_image, borderwidth=0,
         highlightthickness=0, command=calculate_requirements,
         relief="flat"
     ).place(x=375.0, y=634.0, width=588.0, height=85.0)
+
+# Add navigation button to go to Frame 2
+nav_button = Button(
+    frame1, text="Next Page →", 
+    command=show_frame2,
+    bg="#2C2C2C", fg="#FFFFFF",
+    font=("Inter Bold", 16),
+    borderwidth=2,
+    relief="flat",
+    cursor="hand2",
+    activebackground="#404040",
+    activeforeground="#FFFFFF",
+    highlightthickness=0,
+    padx=20,
+    pady=10
+)
+nav_button.place(x=1120, y=40, width=180, height=50)
+
+# Add hover effect for nav button
+def on_enter_nav(e):
+    nav_button['bg'] = '#404040'
+    nav_button['font'] = ('Inter Bold', 17)
+
+def on_leave_nav(e):
+    nav_button['bg'] = '#2C2C2C'
+    nav_button['font'] = ('Inter Bold', 16)
+
+nav_button.bind("<Enter>", on_enter_nav)
+nav_button.bind("<Leave>", on_leave_nav)
 
 
 
@@ -860,5 +957,748 @@ for x, y, img_file in additional_images:
     if img:
         canvas.create_image(x, y, image=img)
 
+# Character data storage
+selected_memetics = {}  # {memetic_name: True/False}
+characters_file = relative_to_assets("characters.txt")
+
+def save_character_data(char_name):
+    """Save character's selected memetics to file in readable format"""
+    server = server_var.get()
+    
+    try:
+        # Read existing data
+        existing_data = []
+        if os.path.exists(characters_file):
+            with open(characters_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+                # Split by character entries (each starts with "Character:")
+                if content.strip():
+                    entries = content.split('\n\nCharacter: ')
+                    if entries:
+                        # First entry might have "Character: " prefix
+                        if entries[0].startswith('Character: '):
+                            existing_data = ['Character: ' + e for e in entries]
+                        else:
+                            existing_data = [entries[0]] + ['Character: ' + e for e in entries[1:]]
+        
+        # Remove old entry for same server+character
+        existing_data = [entry for entry in existing_data 
+                        if entry.strip() and not (f"Character: {char_name}\nServer: {server.lower()}" in entry)]
+        
+        # Create new formatted entry
+        new_entry = f"Character: {char_name}\nServer: {server.lower()}\n"
+        
+        # Group selected memetics by level and category
+        level_groups = {"5-15": {}, "20-35": {}, "40-50": {}}
+        
+        for name, sel in selected_memetics.items():
+            if sel:
+                # Find this memetic in memetic_data
+                for m_name, m_level, m_category, m_server in memetic_data:
+                    if m_name == name:
+                        if m_level not in level_groups:
+                            level_groups[m_level] = {}
+                        if m_category not in level_groups[m_level]:
+                            level_groups[m_level][m_category] = []
+                        level_groups[m_level][m_category].append(name)
+                        break
+        
+        # Format output
+        for level in ["5-15", "20-35", "40-50"]:
+            if level in level_groups:
+                for category in ["Gathering", "Building", "Crafting", "Management"]:
+                    if category in level_groups[level] and level_groups[level][category]:
+                        for memetic_name in level_groups[level][category]:
+                            new_entry += f"Level {level} ({category}): {memetic_name}\n"
+        
+        # Add new entry
+        existing_data.append(new_entry)
+        
+        # Write back with double newline separation
+        with open(characters_file, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(existing_data))
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to save character: {e}")
+
+def load_character_data(char_name):
+    """Load character's selected memetics from file (readable format)"""
+    server = server_var.get()
+    
+    try:
+        if not os.path.exists(characters_file):
+            messagebox.showinfo("Info", "No saved characters found!")
+            return
+        
+        with open(characters_file, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Split by character entries
+        entries = content.split('\n\nCharacter: ')
+        if entries and not entries[0].startswith('Character: '):
+            entries = ['Character: ' + e for e in entries]
+        elif entries and entries[0].startswith('Character: '):
+            entries = ['Character: ' + e for e in entries[1:]]
+            entries.insert(0, content.split('\n\nCharacter: ')[0])
+        
+        # Find matching character
+        for entry in entries:
+            if not entry.strip():
+                continue
+            
+            lines = entry.strip().split('\n')
+            if len(lines) < 2:
+                continue
+            
+            # Parse character and server
+            entry_char = lines[0].replace('Character: ', '').strip()
+            entry_server = lines[1].replace('Server: ', '').strip()
+            
+            if entry_char == char_name and entry_server == server.lower():
+                # Found the character - parse memetics
+                selected_list = []
+                for line in lines[2:]:
+                    if line.startswith('Level '):
+                        # Extract memetic name after ": "
+                        if ': ' in line:
+                            memetic_name = line.split(': ', 1)[1].strip()
+                            selected_list.append(memetic_name)
+                
+                # Update selected memetics
+                for name in selected_memetics:
+                    selected_memetics[name] = name in selected_list
+                
+                # Refresh the display to show selections
+                apply_filter(filter_var.get())
+                messagebox.showinfo("Success", f"Loaded '{char_name}' from {server}!")
+                return
+        
+        messagebox.showinfo("Info", f"Character '{char_name}' not found on {server}!")
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to load character: {e}")
+
+def load_character_choices():
+    """Load saved character choices for current server"""
+    global selected_memetics
+    selected_memetics = {}
+    # Initialize all memetics as unselected
+    for name, level, cat, srv in memetic_data:
+        selected_memetics[name] = False
+
+def update_character_list():
+    """Update character dropdown with saved characters for current server"""
+    server = server_var.get()
+    characters = set()
+    
+    try:
+        if os.path.exists(characters_file):
+            with open(characters_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Split by character entries
+            entries = content.split('\n\nCharacter: ')
+            if entries and not entries[0].startswith('Character: '):
+                entries = ['Character: ' + e for e in entries]
+            elif entries and entries[0].startswith('Character: '):
+                entries = ['Character: ' + e for e in entries[1:]]
+                entries.insert(0, content.split('\n\nCharacter: ')[0])
+            
+            # Parse each entry
+            for entry in entries:
+                if not entry.strip():
+                    continue
+                
+                lines = entry.strip().split('\n')
+                if len(lines) < 2:
+                    continue
+                
+                # Parse character and server
+                entry_char = lines[0].replace('Character: ', '').strip()
+                entry_server = lines[1].replace('Server: ', '').strip()
+                
+                if entry_server == server.lower():
+                    characters.add(entry_char)
+        
+        character_dropdown['values'] = sorted(list(characters))
+    except Exception as e:
+        print(f"Error loading character list: {e}")
+
+# ===== FRAME 2 CONTENT - MEMETIC SPECIALIZATIONS =====
+canvas2 = Canvas(
+    frame2, bg="#FFFFFF", height=785, width=1348, bd=0,
+    highlightthickness=0, relief="ridge"
+)
+canvas2.place(x=0, y=0)
+
+# Add image_3.png to canvas2 (header background)
+if main_images[2]:  # image_3.png is at index 2
+    canvas2.create_image(674.0, 65.0, image=main_images[2])
+
+# Add title text to canvas2
+canvas2.create_text(400.0, 43.0, anchor="nw", text="Alt Memetic Specializations ", fill="#FFFFFF", font=("Inter Bold", 40 * -1))
+
+# Server selection frame
+server_frame = tk.Frame(frame2, bg="#F5F5F5", highlightthickness=1, highlightbackground="#CCCCCC")
+server_frame.place(x=55, y=140, width=300, height=50)
+
+tk.Label(server_frame, text="Server:", bg="#F5F5F5", fg="#333333", font=("Inter Bold", 14)).place(x=10, y=12)
+
+# Server buttons
+server_var = tk.StringVar(value="Manibus")
+server_buttons = {}
+
+def select_server(server_name):
+    server_var.set(server_name)
+    # Update button colors
+    for srv_name, srv_btn in server_buttons.items():
+        if srv_name == server_name:
+            srv_btn.config(bg="#4069D5", fg="#FFFFFF")
+        else:
+            srv_btn.config(bg="#E0E0E0", fg="#000000")
+    # Reload character data for selected server
+    load_character_choices()
+    update_character_list()
+    # Refresh the card display to show server-specific cards
+    apply_filter(filter_var.get())
+
+manibus_btn = tk.Button(
+    server_frame, text="Manibus", command=lambda: select_server("Manibus"),
+    bg="#4069D5", fg="#FFFFFF", font=("Inter Black", 12),
+    borderwidth=0, relief="flat", cursor="hand2"
+)
+manibus_btn.place(x=80, y=10, width=100, height=30)
+server_buttons["Manibus"] = manibus_btn
+
+edream_btn = tk.Button(
+    server_frame, text="Edream", command=lambda: select_server("Edream"),
+    bg="#E0E0E0", fg="#000000", font=("Inter Black", 12),
+    borderwidth=0, relief="flat", cursor="hand2"
+)
+edream_btn.place(x=190, y=10, width=100, height=30)
+server_buttons["Edream"] = edream_btn
+
+# Character name frame
+character_frame = tk.Frame(frame2, bg="#F5F5F5", highlightthickness=1, highlightbackground="#CCCCCC")
+character_frame.place(x=370, y=140, width=530, height=50)
+
+tk.Label(character_frame, text="Character:", bg="#F5F5F5", fg="#333333", font=("Inter Bold", 14)).place(x=10, y=12)
+
+# Character name dropdown
+character_var = tk.StringVar()
+character_dropdown = ttk.Combobox(
+    character_frame, textvariable=character_var,
+    font=("Inter", 11), state="normal", width=22
+)
+character_dropdown.place(x=110, y=10, height=30)
+
+# Save and Load buttons
+def save_character():
+    char_name = character_var.get().strip()
+    if char_name:
+        # Save selected memetics to file
+        save_character_data(char_name)
+        # Update dropdown list
+        update_character_list()
+        messagebox.showinfo("Success", f"Character '{char_name}' saved!")
+    else:
+        messagebox.showwarning("Warning", "Please enter a character name!")
+
+def load_character():
+    char_name = character_var.get().strip()
+    if char_name:
+        load_character_data(char_name)
+    else:
+        messagebox.showwarning("Warning", "Please select a character name!")
+
+save_btn = tk.Button(
+    character_frame, text="Save", command=save_character,
+    bg="#4CAF50", fg="#FFFFFF", font=("Inter Black", 12),
+    borderwidth=0, relief="flat", cursor="hand2"
+)
+save_btn.place(x=360, y=10, width=70, height=30)
+
+load_btn = tk.Button(
+    character_frame, text="Load", command=load_character,
+    bg="#2196F3", fg="#FFFFFF", font=("Inter Black", 12),
+    borderwidth=0, relief="flat", cursor="hand2"
+)
+load_btn.place(x=440, y=10, width=70, height=30)
+
+# Create filter frame
+filter_frame = tk.Frame(frame2, bg="#F5F5F5", highlightthickness=1, highlightbackground="#CCCCCC")
+filter_frame.place(x=920, y=140, width=325, height=50)
+
+# Filter buttons
+filter_var = tk.StringVar(value="All")
+filter_buttons = {}
+
+filter_buttons_data = [
+    ("All", 10),
+    ("Own", 70),
+    ("5-15", 135),
+    ("20-35", 200),
+    ("40-50", 270)
+]
+
+def apply_filter(category):
+    filter_var.set(category)
+    
+    # Update button colors
+    for btn_name, btn in filter_buttons.items():
+        if btn_name == category:
+            btn.config(bg="#4069D5", fg="#FFFFFF")
+        else:
+            btn.config(bg="#E0E0E0", fg="#000000")
+    
+    # Clear existing cards
+    for widget in cards_frame.winfo_children():
+        widget.destroy()
+    
+    # Get current server
+    current_server = server_var.get()
+    
+    # Filter and display cards based on category AND server
+    if category == "All":
+        filtered_data = [(name, level, cat, srv) for name, level, cat, srv in memetic_data 
+                        if srv == "All" or srv == current_server]
+    elif category == "Own":
+        # Show only selected cards
+        filtered_data = [(name, level, cat, srv) for name, level, cat, srv in memetic_data 
+                        if selected_memetics.get(name, False) and (srv == "All" or srv == current_server)]
+    elif category == "5-15":
+        filtered_data = [(name, level, cat, srv) for name, level, cat, srv in memetic_data 
+                        if level == "5-15" and (srv == "All" or srv == current_server)]
+    elif category == "20-35":
+        filtered_data = [(name, level, cat, srv) for name, level, cat, srv in memetic_data 
+                        if level == "20-35" and (srv == "All" or srv == current_server)]
+    elif category == "40-50":
+        filtered_data = [(name, level, cat, srv) for name, level, cat, srv in memetic_data 
+                        if level == "40-50" and (srv == "All" or srv == current_server)]
+    else:
+        # Category-specific filter (Gathering, Building, Crafting, Management)
+        filtered_data = [(name, level, cat, srv) for name, level, cat, srv in memetic_data 
+                        if cat == category and (srv == "All" or srv == current_server)]
+    
+    # Recreate cards with filtered data
+    for idx, (name, level, cat, srv) in enumerate(filtered_data):
+        row = idx // 6
+        col = idx % 6
+        create_memetic_card(cards_frame, name, level, cat, row, col)
+    
+    # Update scroll region with optimized refresh
+    window.update_idletasks()
+    scroll_canvas.configure(scrollregion=scroll_canvas.bbox("all"))
+    # Reset scroll to top
+    scroll_canvas.yview_moveto(0)
+
+for text, x_pos in filter_buttons_data:
+    btn = tk.Button(
+        filter_frame,
+        text=text,
+        command=lambda t=text: apply_filter(t),
+        bg="#4069D5" if text == "All" else "#E0E0E0",
+        fg="#FFFFFF" if text == "All" else "#000000",
+        font=("Inter Black", 12),
+        borderwidth=0,
+        relief="flat",
+        cursor="hand2"
+    )
+    btn.place(x=x_pos, y=10, width=50, height=30)
+    filter_buttons[text] = btn
+
+# Create scrollable frame for memetic cards with optimized scrolling
+scroll_canvas = Canvas(frame2, bg="#FFFFFF", highlightthickness=0)
+scroll_canvas.place(x=50, y=200, width=1250, height=480)
+
+# Create scrollbar
+scrollbar = tk.Scrollbar(frame2, orient="vertical", command=scroll_canvas.yview)
+scrollbar.place(x=1300, y=200, height=480)
+scroll_canvas.configure(yscrollcommand=scrollbar.set)
+
+# Create frame inside canvas for cards
+cards_frame = tk.Frame(scroll_canvas, bg="#FFFFFF")
+scroll_canvas.create_window((0, 0), window=cards_frame, anchor="nw")
+
+# Optimize scrolling performance with smoother mousewheel
+def on_mousewheel(event):
+    scroll_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+
+scroll_canvas.bind_all("<MouseWheel>", on_mousewheel)
+
+# Dictionary to store loaded memetic images
+memetic_images = {}
+
+def load_memetic_image(name):
+    """Load memetic specialization image by name with caching and optimization"""
+    # Check if already loaded
+    if name in memetic_images:
+        return memetic_images[name]
+    
+    # Create filename from name (handle special characters)
+    # Remove colons but keep spaces and ampersands
+    filename = name.replace(": ", " ").replace(":", " ").strip() + ".png"
+    
+    try:
+        # Load and resize image to fit card (120x120) - optimized resize
+        pil_img = Image.open(relative_to_assets(filename))
+        # Use NEAREST for fastest performance, BILINEAR for better quality
+        pil_img = pil_img.resize((120, 120), Image.Resampling.NEAREST)
+        # Convert to RGB to reduce memory
+        if pil_img.mode != 'RGB':
+            pil_img = pil_img.convert('RGB')
+        img = ImageTk.PhotoImage(pil_img)
+        memetic_images[name] = img  # Cache it
+        return img
+    except Exception as e:
+        # Try alternative with "and" instead of "&"
+        try:
+            filename_alt = name.replace(": ", " ").replace(":", " ").replace(" & ", " and ").strip() + ".png"
+            pil_img = Image.open(relative_to_assets(filename_alt))
+            pil_img = pil_img.resize((120, 120), Image.Resampling.NEAREST)
+            if pil_img.mode != 'RGB':
+                pil_img = pil_img.convert('RGB')
+            img = ImageTk.PhotoImage(pil_img)
+            memetic_images[name] = img  # Cache it
+            return img
+        except:
+            print(f"Could not load image for {name}: {e}")
+            memetic_images[name] = None  # Cache failure too
+    return None
+
+def create_memetic_card(parent, name, level, category, row, col):
+    """Create a selectable memetic specialization card with actual image"""
+    # Initialize selection state if not exists
+    if name not in selected_memetics:
+        selected_memetics[name] = False
+    
+    # Determine border color based on selection
+    border_color = "#4CAF50" if selected_memetics[name] else "#CCCCCC"
+    bg_color = "#E8F5E9" if selected_memetics[name] else "#F5F5F5"
+    
+    card = tk.Frame(parent, bg=bg_color, highlightthickness=2, highlightbackground=border_color, width=190, height=220)
+    card.grid(row=row, column=col, padx=5, pady=5, sticky="nsew")
+    card.grid_propagate(False)  # Maintain fixed size
+    
+    # Load and display actual image (cached automatically)
+    img = load_memetic_image(name)
+    if img:
+        img_label = tk.Label(card, image=img, bg=bg_color)
+        img_label.pack(pady=3)
+    else:
+        # Fallback to placeholder if image not found
+        img_label = tk.Label(card, bg="#CCCCCC", width=15, height=6, text="No Image", font=("Inter", 8))
+        img_label.pack(pady=3)
+    
+    # Name (truncate if too long)
+    display_name = name if len(name) <= 25 else name[:22] + "..."
+    name_label = tk.Label(card, text=display_name, bg=bg_color, fg="#1A1A1A", font=("Inter ExtraBold", 11), wraplength=180)
+    name_label.pack(pady=3)
+    
+    # Level and Category
+    info_frame = tk.Frame(card, bg=bg_color)
+    info_frame.pack(pady=5)
+    tk.Label(info_frame, text=f"Lv.{level}", bg=bg_color, fg="#4069D5", font=("Inter Black", 12)).pack(side=tk.LEFT, padx=3)
+    tk.Label(info_frame, text=f"• {category}", bg=bg_color, fg="#555555", font=("Inter Bold", 9)).pack(side=tk.LEFT, padx=2)
+    
+    # Make card clickable with level-based limits
+    def toggle_selection(event=None):
+        # Check current selection count for this level range
+        level_selected = sum(1 for n, l, c, s in memetic_data 
+                            if selected_memetics.get(n, False) and l == level)
+        
+        if not selected_memetics[name]:
+            # Trying to select - check limit based on level range
+            if level in ["20-35"]:
+                max_selections = 4
+            else:
+                max_selections = 3
+                
+            if level_selected >= max_selections:
+                messagebox.showwarning("Selection Limit", 
+                                      f"You can only select {max_selections} memetics from level {level}!")
+                return
+            selected_memetics[name] = True
+        else:
+            # Deselecting - always allowed
+            selected_memetics[name] = False
+        
+        # Update card appearance
+        if selected_memetics[name]:
+            card.config(bg="#E8F5E9", highlightbackground="#4CAF50")
+            img_label.config(bg="#E8F5E9")
+            name_label.config(bg="#E8F5E9")
+            info_frame.config(bg="#E8F5E9")
+            for child in info_frame.winfo_children():
+                child.config(bg="#E8F5E9")
+        else:
+            card.config(bg="#F5F5F5", highlightbackground="#CCCCCC")
+            img_label.config(bg="#F5F5F5")
+            name_label.config(bg="#F5F5F5")
+            info_frame.config(bg="#F5F5F5")
+            for child in info_frame.winfo_children():
+                child.config(bg="#F5F5F5")
+    
+    # Bind click events to all widgets in the card
+    card.bind("<Button-1>", toggle_selection)
+    img_label.bind("<Button-1>", toggle_selection)
+    name_label.bind("<Button-1>", toggle_selection)
+    info_frame.bind("<Button-1>", toggle_selection)
+    for child in info_frame.winfo_children():
+        child.bind("<Button-1>", toggle_selection)
+    
+    # Change cursor on hover
+    card.config(cursor="hand2")
+    
+    return card
+
+def show_memetic_details(name, level, category):
+    """Show details popup for memetic specialization"""
+    details_window = tk.Toplevel(window)
+    details_window.title(f"{name}")
+    details_window.geometry("400x300")
+    details_window.resizable(False, False)
+    
+    # Add icon
+    if app_icon:
+        details_window.iconphoto(False, app_icon)
+    
+    # Content
+    tk.Label(details_window, text=name, font=("Inter Bold", 16), wraplength=350).pack(pady=20)
+    tk.Label(details_window, text=f"Level: {level}", font=("Inter", 12)).pack(pady=5)
+    tk.Label(details_window, text=f"Category: {category}", font=("Inter", 12)).pack(pady=5)
+    
+    # Close button
+    tk.Button(details_window, text="Close", command=details_window.destroy,
+              bg="#4069D5", fg="#FFFFFF", font=("Inter", 12),
+              borderwidth=0, relief="flat", cursor="hand2").pack(pady=20)
+
+# Complete memetic specializations data
+# Format: (name, level, category, server)
+# server: "All" = show on both servers, "Edream" = Edream only, "Manibus" = Manibus only
+memetic_data = [
+    # Level 5-15 (Gathering)
+    ("Furnace: Precision Refining", "5-15", "Gathering", "All"),
+    ("Load Handling", "5-15", "Gathering", "All"),
+    ("Pickaxe: Moonlight Mining", "5-15", "Gathering", "All"),
+    ("Pickaxe: Forest Foe", "5-15", "Gathering", "All"),
+    ("Disassembly Bench: Careful Disassembly", "5-15", "Gathering", "All"),
+    ("Super Refinery", "5-15", "Gathering", "All"),
+    
+    # Level 5-15 (Building)
+    ("Flamethrower Trap: Scorching Blast", "5-15", "Building", "All"),
+    ("Robotics Facility: Skilled Mechanician", "5-15", "Building", "All"),
+    ("Wood Structures: Tough Plant", "5-15", "Building", "All"),
+    ("Bed: A Place to Call Home", "5-15", "Building", "All"),
+    ("Deluxe Storage Crate", "5-15", "Building", "All"),
+    ("Basic Defense: Battle-Hardened", "5-15", "Building", "All"),
+    
+    # Level 5-15 (Crafting)
+    ("Gear Workbench: Customization", "5-15", "Crafting", "All"),
+    ("Explosive On-the-Go", "5-15", "Crafting", "All"),
+    ("Electronics Grabber", "5-15", "Crafting", "All"),
+    ("Disassembly Bench: Electronic Recycling", "5-15", "Crafting", "All"),
+    ("Throwing Dagger: Bullseye", "5-15", "Crafting", "All"),
+    ("Jump Booster", "5-15", "Crafting", "All"),
+    ("Explosive Sack", "5-15", "Crafting", "All"),
+    ("Backpack Expansion", "5-15", "Crafting", "All"),
+    ("Supplies Workbench: Ammo Factory", "5-15", "Crafting", "All"),
+    
+    # Level 5-15 (Management)
+    ("Chef's Knife", "5-15", "Management", "All"),
+    ("Portable Diving Gear", "5-15", "Management", "All"),
+    ("Roasted & Dried: Low and Slow", "5-15", "Management", "All"),
+    ("Stove: Long-Term Storage", "5-15", "Management", "All"),
+    ("Portable Rainwater Collection System", "5-15", "Management", "All"),
+    ("Gardening Gloves", "5-15", "Management", "All"),
+    ("Harvesting Sickle", "5-15", "Management", "All"),
+    ("Compost Bin", "5-15", "Management", "All"),
+    ("Activated Carbon Filter", "5-15", "Management", "All"),
+    
+    # Level 20-35 (Gathering)
+    ("Chainsaw: Chainsaw Horror Show", "20-35", "Gathering", "All"),
+    ("Electric Drill: Treasure Hunter", "20-35", "Gathering", "All"),
+    ("Electric Furnace: Efficiency Lover", "20-35", "Gathering", "All"),
+    ("Oil Processing", "20-35", "Gathering", "All"),
+    ("Precious Metal Refining", "20-35", "Gathering", "All"),
+    ("Solar Drill", "20-35", "Gathering", "All"),
+    
+    # Level 20-35 (Building)
+    ("Furnace: Sintering", "20-35", "Building", "All"),
+    ("Updraft Device: Gravity Lite", "20-35", "Building", "All"),
+    ("Stone Structures: Intense Defense", "20-35", "Building", "All"),
+    ("Shotgun Turret: Volley Fire", "20-35", "Building", "All"),
+    ("Biomass Missile: Ample Munition", "20-35", "Building", "All"),
+    ("Gravitational Grip: Bonds of Guidance", "20-35", "Building", "All"),
+    
+    # Level 20-35 (Crafting)
+    ("Claymore Mine: Warrior's Resolve", "20-35", "Crafting", "All"),
+    ("Adrenaline Shot: Phoenix", "20-35", "Crafting", "All"),
+    ("Explosive Throwables: Echo Blast", "20-35", "Crafting", "All"),
+    ("Synthesis Bench: Recycle & Reuse", "20-35", "Crafting", "All"),
+    ("Sulfur Chemist", "20-35", "Crafting", "All"),
+    ("Supplies Workbench: Healing Boost", "20-35", "Crafting", "All"),
+    ("Portable Updraft Device", "20-35", "Crafting", "All"),
+    ("Combo Chipset", "20-35", "Crafting", "All"),
+    ("Portable MG Turret: Barrage of Bullets", "20-35", "Crafting", "All"),
+    
+    # Level 20-35 (Management)
+    ("Portable Fridge", "20-35", "Management", "All"),
+    ("Improved Compound Fertilizer", "20-35", "Management", "All"),
+    ("Biomass Generator: Sustained Output", "20-35", "Management", "All"),
+    ("Generator: Electrical Expert", "20-35", "Management", "All"),
+    ("Canned Goods: Mini Canner", "20-35", "Management", "All"),
+    ("Solar Generator: Photon Power", "20-35", "Management", "All"),
+    ("Stardust Water Pump", "20-35", "Management", "All"),
+    ("Iced Treat: Brain Freeze", "20-35", "Management", "All"),
+    
+    # Level 40-50 (Gathering)
+    ("Electric Furnace: Electrolysis", "40-50", "Gathering", "All"),
+    ("Art of Stardust Decay", "40-50", "Gathering", "All"),
+    ("Crystal Transformation", "40-50", "Gathering", "All"),
+    ("Gold Pickaxe and Silver Pickaxe", "40-50", "Gathering", "All"),
+    ("Lucky Logging Platform", "40-50", "Gathering", "All"),
+    ("Stardust Mining Platform", "40-50", "Gathering", "All"),
+    
+    # Level 40-50 (Building)
+    ("Reinforced Structures: Healing Defense", "40-50", "Building", "All"),
+    ("Red Plasma Rounds", "40-50", "Building", "All"),
+    ("Gatling Cannon: Power Blast", "40-50", "Building", "All"),
+    ("Rifle Turret: Two Birds One Stone", "40-50", "Building", "All"),
+    
+    # Level 40-50 (Crafting)
+    ("High Power Warhead", "40-50", "Crafting", "All"),
+    ("Ultra Grenade", "40-50", "Crafting", "All"),
+    ("Supplies Workbench: Anti-Armor", "40-50", "Crafting", "All"),
+    ("Stardust Barrier: Hold the Line", "40-50", "Crafting", "All"),
+    ("Rare Crystal Set", "40-50", "Crafting", "All"),
+    ("Stardust Regulator", "40-50", "Crafting", "All"),
+    ("Golden Knife", "40-50", "Crafting", "All"),
+    ("Spectral Cloak", "40-50", "Crafting", "All"),
+    ("Scout Drone: Invisible Hunter", "40-50", "Crafting", "All"),
+    
+    # Level 40-50 (Management)
+    ("Kitchen Set: Gourmand", "40-50", "Management", "All"),
+    ("Stardust Dish: Shell Break", "40-50", "Management", "All"),
+    ("Nalcott Easter Egg", "40-50", "Management", "All"),
+    ("Hydraulic Generator: One with the Tides", "40-50", "Management", "All"),
+    ("Deviant Power Generator: Stardust Unleashed", "40-50", "Management", "All"),
+    ("Pulse Power Device", "40-50", "Management", "All"),
+    
+    # ===== EDREAM-ONLY CARDS =====
+    
+    # Level 5-15 Edream Only
+    ("Furnace: Large Furnace", "5-15", "Gathering", "Edream"),
+    ("Supplies Workbench: Forest Hunter", "5-15", "Crafting", "Edream"),
+    ("Snowmobile", "5-15", "Crafting", "Edream"),
+    ("Blade Fan", "5-15", "Crafting", "Edream"),
+    ("Spicy Pepper", "5-15", "Management", "Edream"),
+    
+    # Level 20-35 Edream Only
+    ("Gunpowder Extraction", "20-35", "Gathering", "Edream"),
+    ("Molecular Structure Research", "20-35", "Gathering", "Edream"),
+    ("Furnace: Chaosium Material Analysis", "20-35", "Gathering", "Edream"),
+    ("Scout Drone: Freezing Drone", "20-35", "Crafting", "Edream"),
+    ("Frost Armor", "20-35", "Crafting", "Edream"),
+    ("Grenade: Line Charge", "20-35", "Crafting", "Edream"),
+    ("Ice Throwing Dagger and Flame Throwing Dagger", "20-35", "Crafting", "Edream"),
+    ("Portable Thermostat", "20-35", "Crafting", "Edream"),
+    ("Claymore Mine: Frost Trap", "20-35", "Crafting", "Edream"),
+    ("Portable Gun Turret: Explosive Automatic Ammo", "20-35", "Crafting", "Edream"),
+    ("Bed: Heat Preservation", "20-35", "Building", "Edream"),
+    ("Dummy: Fear and Terror", "20-35", "Building", "Edream"),
+    ("Generator: Heat Dissipation", "20-35", "Management", "Edream"),
+    ("Refining Facility: Smelting", "20-35", "Management", "Edream"),
+    ("Water Pump: Underground Pump", "20-35", "Management", "Edream"),
+    ("Biomass Generator: Heat Generator", "20-35", "Management", "Edream"),
+    ("Planter Box: Greenhouse Planting", "20-35", "Management", "Edream"),
+    ("Grilled Dish: Grilling Master", "20-35", "Management", "Edream"),
+    
+    # Level 40-50 Edream Only
+    ("Metal Dissolution", "40-50", "Gathering", "Edream"),
+    ("Grenade: Cluster Grenade", "40-50", "Crafting", "Edream"),
+    ("Composite Crystal", "40-50", "Crafting", "Edream"),
+    ("Frag Grenade: Viscoelastic Cold Fire", "40-50", "Crafting", "Edream"),
+    ("Silentfire Shield", "40-50", "Crafting", "Edream"),
+    ("Flamethrower Trap: Kebob Party", "40-50", "Building", "Edream"),
+    ("Building Master", "40-50", "Building", "Edream"),
+    ("Deviant Power Generator: Energy Extraction", "40-50", "Management", "Edream"),
+    ("Fish Pheromones", "40-50", "Management", "Edream"),
+]
+
+# Configure grid weights for 6 columns
+for i in range(6):
+    cards_frame.columnconfigure(i, weight=1, minsize=200)
+
+# Function to populate cards initially
+def populate_initial_cards():
+    """Populate initial cards after window is shown"""
+    current_server = server_var.get()
+    visible_idx = 0
+    for name, level, category, server in memetic_data:
+        # Show card if it's for "All" servers or matches current server
+        if server == "All" or server == current_server:
+            row = visible_idx // 6
+            col = visible_idx % 6
+            create_memetic_card(cards_frame, name, level, category, row, col)
+            visible_idx += 1
+    
+    # Update scroll region after all cards are created
+    window.update_idletasks()
+    scroll_canvas.configure(scrollregion=scroll_canvas.bbox("all"))
+
+# Schedule initial card population
+window.after(50, populate_initial_cards)
+
+# Initialize character system (after memetic_data is defined)
+update_character_list()
+load_character_choices()
+
+# Add back button to return to Frame 1
+back_button = Button(
+    frame2, text="← Back", 
+    command=show_frame1,
+    bg="#2C2C2C", fg="#FFFFFF",
+    font=("Inter Bold", 16),
+    borderwidth=2,
+    relief="flat",
+    cursor="hand2",
+    activebackground="#404040",
+    activeforeground="#FFFFFF",
+    highlightthickness=0,
+    padx=20,
+    pady=10
+)
+back_button.place(x=40, y=40, width=180, height=50)
+
+# Add hover effect for back button
+def on_enter_back(e):
+    back_button['bg'] = '#404040'
+    back_button['font'] = ('Inter Bold', 17)
+
+def on_leave_back(e):
+    back_button['bg'] = '#2C2C2C'
+    back_button['font'] = ('Inter Bold', 16)
+
+back_button.bind("<Enter>", on_enter_back)
+back_button.bind("<Leave>", on_leave_back)
+
 window.resizable(False, False)
+
+# Preload first batch of images in background for faster initial display
+def preload_images():
+    """Preload first 30 images in background"""
+    current_server = server_var.get()
+    count = 0
+    for name, level, cat, srv in memetic_data:
+        if srv == "All" or srv == current_server:
+            if name not in memetic_images:
+                load_memetic_image(name)
+                count += 1
+                if count >= 30:  # Preload first 30 cards
+                    break
+
+# Schedule preloading after window is shown
+window.after(100, preload_images)
+
+# Show window after everything is loaded
+window.deiconify()
 window.mainloop()

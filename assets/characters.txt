@@ -1,0 +1,36 @@
+Character: Character: Character: zezo
+Server: manibus
+Level 5-15 (Gathering): Pickaxe: Moonlight Mining
+Level 5-15 (Gathering): Pickaxe: Forest Foe
+Level 5-15 (Gathering): Disassembly Bench: Careful Disassembly
+Level 20-35 (Building): Updraft Device: Gravity Lite
+Level 20-35 (Building): Stone Structures: Intense Defense
+Level 20-35 (Building): Shotgun Turret: Volley Fire
+Level 40-50 (Building): Gatling Cannon: Power Blast
+Level 40-50 (Building): Rifle Turret: Two Birds One Stone
+Level 40-50 (Crafting): High Power Warhead
+Character: zero
+Server: manibus
+Level 5-15 (Gathering): Pickaxe: Moonlight Mining
+Level 5-15 (Gathering): Pickaxe: Forest Foe
+Level 5-15 (Gathering): Disassembly Bench: Careful Disassembly
+Level 20-35 (Building): Updraft Device: Gravity Lite
+Level 20-35 (Building): Stone Structures: Intense Defense
+Level 20-35 (Building): Shotgun Turret: Volley Fire
+Level 20-35 (Building): Biomass Missile: Ample Munition
+Level 40-50 (Building): Rifle Turret: Two Birds One Stone
+Level 40-50 (Crafting): High Power Warhead
+Level 40-50 (Crafting): Ultra Grenade
+
+Character: zzaa
+Server: edream
+Level 5-15 (Gathering): Disassembly Bench: Careful Disassembly
+Level 5-15 (Gathering): Super Refinery
+Level 5-15 (Building): Basic Defense: Battle-Hardened
+Level 20-35 (Building): Updraft Device: Gravity Lite
+Level 20-35 (Building): Stone Structures: Intense Defense
+Level 20-35 (Building): Shotgun Turret: Volley Fire
+Level 20-35 (Building): Biomass Missile: Ample Munition
+Level 40-50 (Building): Rifle Turret: Two Birds One Stone
+Level 40-50 (Crafting): High Power Warhead
+Level 40-50 (Crafting): Ultra Grenade
