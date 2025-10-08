@@ -786,19 +786,36 @@ def animate_transition(from_frame, to_frame, direction='right'):
             window.after(delay, lambda: slide_step(step + 1))
         else:
             # Animation complete - clean up
-            from_frame.place_forget()
+            # Move from_frame far off screen instead of place_forget
+            from_frame.place(x=5000, y=0, width=1348, height=785)
+            from_frame.lower()
+            # Position to_frame correctly
             to_frame.place(x=0, y=0, width=1348, height=785)
             to_frame.lift()
+            to_frame.tkraise()
+            # Set focus to the new frame
+            to_frame.focus_set()
+            # Update to ensure proper stacking
+            window.update_idletasks()
     
     # Start animation
     slide_step(0)
 
 # Function to show frame 1
 def show_frame1():
+    # Unbind mousewheel when leaving frame2
+    try:
+        scroll_canvas.unbind_all("<MouseWheel>")
+    except:
+        pass
+    # Lower frame2 to ensure frame1 is accessible
+    frame2.lower()
     animate_transition(frame2, frame1, direction='left')
 
 # Function to show frame 2
 def show_frame2():
+    # Lower frame1 to ensure frame2 is accessible
+    frame1.lower()
     animate_transition(frame1, frame2, direction='right')
 
 # Initially show frame 1
@@ -862,6 +879,7 @@ for x, y, img in entry_positions:
     if img:
         canvas.create_image(x, y, image=img)
         entry = Entry(
+            frame1,
             bd=0, bg="#535353", fg="#FFFFFF",
             highlightthickness=0, font=bold_font, justify='center'
         )
@@ -1569,7 +1587,15 @@ character_display_text.config(state=tk.DISABLED)
 def on_mousewheel(event):
     scroll_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
 
-scroll_canvas.bind_all("<MouseWheel>", on_mousewheel)
+# Bind mousewheel only when hovering over the scroll canvas area
+def bind_mousewheel(event):
+    scroll_canvas.bind_all("<MouseWheel>", on_mousewheel)
+
+def unbind_mousewheel(event):
+    scroll_canvas.unbind_all("<MouseWheel>")
+
+scroll_canvas.bind("<Enter>", bind_mousewheel)
+scroll_canvas.bind("<Leave>", unbind_mousewheel)
 
 # Dictionary to store loaded memetic images
 memetic_images = {}
