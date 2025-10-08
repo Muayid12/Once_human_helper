@@ -214,16 +214,22 @@ def show_formatted_report(report, show_transfer_button=False, raw_data=None):
     report_window.geometry("750x700")
     report_window.resizable(False, False)
     report_window.configure(bg="#F3F4F6")
+    
+    # Set initial state for always on top
+    report_window.attributes('-topmost', False)
+    # Set initial window opacity to 100% (fully opaque)
+    report_window.attributes('-alpha', 1.0)
+    
     app_icon = load_image("appicon1.png")
     if app_icon:
         report_window.iconphoto(False, app_icon)
-    
+
     # Create header frame with gray theme
     header_frame = tk.Frame(report_window, bg="#374151", height=70)
     header_frame.pack(fill=tk.X)
     header_frame.pack_propagate(False)
     
-    # Header title
+    # Header title (left side)
     header_label = tk.Label(
         header_frame, 
         text="📊 Total Requirements Report",
@@ -231,7 +237,113 @@ def show_formatted_report(report, show_transfer_button=False, raw_data=None):
         fg="#F9FAFB",
         font=("Segoe UI", 20, "bold")
     )
-    header_label.pack(pady=20)
+    header_label.pack(side=tk.LEFT, padx=20, pady=20)
+    
+    # Controls container (right side initially, will be centered when title is hidden)
+    controls_frame = tk.Frame(header_frame, bg="#374151")
+    controls_frame.pack(side=tk.RIGHT, padx=20, pady=20)
+    
+    # Always on top toggle
+    always_on_top_var = tk.BooleanVar(value=False)
+    
+    # Store references to elements that need to be hidden/shown
+    elements_to_hide = []
+    
+    def toggle_always_on_top():
+        is_on_top = always_on_top_var.get()
+        report_window.attributes('-topmost', is_on_top)
+        # Hide/show title bar based on always on top state
+        if is_on_top:
+            report_window.overrideredirect(True)  # Hide title bar
+            topmost_btn.config(bg="#059669")  # Green when on top
+            # Enable opacity controls
+            opacity_active[0] = True
+            # Hide header title text
+            header_label.pack_forget()
+            # Recenter controls now that title is hidden
+            controls_frame.pack_forget()
+            controls_frame.pack(expand=True, pady=20)
+            # Hide search frame, separator, and buttons frame
+            for element in elements_to_hide:
+                element.pack_forget()
+            # Resize window to be smaller (remove ~150px for hidden elements and title bar)
+            report_window.geometry("420x520")
+        else:
+            report_window.overrideredirect(False)  # Show title bar
+            topmost_btn.config(bg="#6B7280")  # Gray when normal
+            # Disable opacity controls and reset to 100%
+            opacity_active[0] = False
+            current_opacity[0] = 1.0
+            report_window.attributes('-alpha', 1.0)
+            update_transparency_label()
+            # Show header title text
+            header_label.pack(side=tk.LEFT, padx=20, pady=20)
+            # Move controls back to the right
+            controls_frame.pack_forget()
+            controls_frame.pack(side=tk.RIGHT, padx=20, pady=20)
+            # Show search frame, separator, and buttons frame
+            if len(elements_to_hide) >= 3:
+                elements_to_hide[0].pack(pady=(0, 10), fill=tk.X)  # search_frame
+                elements_to_hide[1].pack(fill=tk.X, pady=(0, 15))  # separator
+                elements_to_hide[2].pack(pady=0)  # buttons_frame
+            # Resize window back to normal size
+            report_window.geometry("750x700")
+    
+    topmost_btn = tk.Button(
+        controls_frame,
+        text="📌",
+        command=toggle_always_on_top,
+        bg="#6B7280",
+        fg="#F9FAFB",
+        font=("Segoe UI", 12, "bold"),
+        relief="flat",
+        cursor="hand2",
+        width=2,
+        height=1
+    )
+    topmost_btn.pack(side=tk.LEFT, padx=(0, 10))
+    
+    # Update the button state
+    def update_topmost_button():
+        always_on_top_var.set(not always_on_top_var.get())
+        toggle_always_on_top()
+    
+    topmost_btn.config(command=update_topmost_button)
+    
+    # Add hover effect for topmost button
+    def on_enter_topmost(e):
+        current_bg = topmost_btn.cget("bg")
+        if current_bg == "#059669":  # Green (On Top)
+            topmost_btn.config(bg="#047857")
+        else:  # Gray (Normal)
+            topmost_btn.config(bg="#4B5563")
+    
+    def on_leave_topmost(e):
+        if always_on_top_var.get():
+            topmost_btn.config(bg="#059669")
+        else:
+            topmost_btn.config(bg="#6B7280")
+    
+    topmost_btn.bind("<Enter>", on_enter_topmost)
+    topmost_btn.bind("<Leave>", on_leave_topmost)
+    
+    # Transparency controls (widgets only, functions defined later)
+    transparency_frame = tk.Frame(controls_frame, bg="#374151")
+    transparency_frame.pack(side=tk.LEFT)
+    
+    transparency_label = tk.Label(
+        transparency_frame,
+        text="Opacity:",
+        bg="#374151",
+        fg="#F9FAFB",
+        font=("Segoe UI", 10)
+    )
+    transparency_label.pack(side=tk.LEFT, padx=(0, 5))
+    
+    # Store current window opacity (0.0 to 1.0)
+    current_opacity = [1.0]  # Using list to allow modification in nested functions
+    # Store whether opacity controls are active
+    opacity_active = [False]
 
     # Create main content frame with gray theme
     frame = tk.Frame(report_window, bg="#F3F4F6")
@@ -264,6 +376,88 @@ def show_formatted_report(report, show_transfer_button=False, raw_data=None):
         selectforeground="#1E40AF"
     )
     text_widget.pack(fill=tk.BOTH, expand=False, padx=2, pady=2)
+
+    # Now define transparency functions after text_widget is created
+    def update_window_opacity():
+        """Update the entire window opacity (only when always on top is active)"""
+        if opacity_active[0]:
+            report_window.attributes('-alpha', current_opacity[0])
+    
+    def decrease_transparency():
+        if opacity_active[0]:
+            current_opacity[0] = max(0.2, current_opacity[0] - 0.05)  # Minimum 20% opacity
+            update_window_opacity()
+            update_transparency_label()
+    
+    def increase_transparency():
+        if opacity_active[0]:
+            current_opacity[0] = min(1.0, current_opacity[0] + 0.05)  # Maximum 100% opacity
+            update_window_opacity()
+            update_transparency_label()
+    
+    def update_transparency_label():
+        percentage = int(current_opacity[0] * 100)
+        transparency_value_label.config(text=f"{percentage}%")
+    
+    # Create transparency control buttons
+    # Decrease opacity button (more transparent)
+    decrease_btn = tk.Button(
+        transparency_frame,
+        text="−",
+        command=decrease_transparency,
+        bg="#4B5563",
+        fg="#F9FAFB",
+        font=("Segoe UI", 14, "bold"),
+        relief="flat",
+        cursor="hand2",
+        width=2,
+        height=1
+    )
+    decrease_btn.pack(side=tk.LEFT, padx=2)
+    
+    # Opacity percentage display
+    transparency_value_label = tk.Label(
+        transparency_frame,
+        text="100%",
+        bg="#374151",
+        fg="#F9FAFB",
+        font=("Segoe UI", 11, "bold"),
+        width=5
+    )
+    transparency_value_label.pack(side=tk.LEFT, padx=5)
+    
+    # Increase opacity button (less transparent)
+    increase_btn = tk.Button(
+        transparency_frame,
+        text="+",
+        command=increase_transparency,
+        bg="#4B5563",
+        fg="#F9FAFB",
+        font=("Segoe UI", 14, "bold"),
+        relief="flat",
+        cursor="hand2",
+        width=2,
+        height=1
+    )
+    increase_btn.pack(side=tk.LEFT, padx=2)
+    
+    # Add hover effects for transparency buttons
+    def on_enter_decrease(e):
+        decrease_btn.config(bg="#6B7280")
+    
+    def on_leave_decrease(e):
+        decrease_btn.config(bg="#4B5563")
+    
+    def on_enter_increase(e):
+        increase_btn.config(bg="#6B7280")
+    
+    def on_leave_increase(e):
+        increase_btn.config(bg="#4B5563")
+    
+    decrease_btn.bind("<Enter>", on_enter_decrease)
+    decrease_btn.bind("<Leave>", on_leave_decrease)
+    increase_btn.bind("<Enter>", on_enter_increase)
+    increase_btn.bind("<Leave>", on_leave_increase)
 
     # Define tags with larger, more readable fonts
     text_widget.tag_configure("bold", font=("Segoe UI", 13, "bold"))
@@ -425,7 +619,7 @@ def show_formatted_report(report, show_transfer_button=False, raw_data=None):
             "Water Tank", "Securement", "Normal Refinery", "Furnace", "Blue Light",
             "Radio", "ADVHydraulic", "ADVBiomass", "Deviation"
         ]
-        
+
         for item in item_names:
             start_idx = "1.0"
             while True:
@@ -465,13 +659,14 @@ def show_formatted_report(report, show_transfer_button=False, raw_data=None):
             text_widget.tag_remove("material_name", start_idx, end_idx)
             text_widget.tag_add('red', start_idx, end_idx)
             start_idx = end_idx
-    
+
     # Insert initial report (do this later after creating all UI elements)
     # We'll insert and format the text after defining all functions
     
     # Create a modern search bar with gray theme
     search_frame = tk.Frame(frame, bg="#F3F4F6")
     search_frame.pack(pady=(0, 10), fill=tk.X)
+    elements_to_hide.append(search_frame)  # Add to hide list
     
     # Search icon label
     search_icon = tk.Label(
@@ -696,14 +891,16 @@ def show_formatted_report(report, show_transfer_button=False, raw_data=None):
     # Gray themed buttons frame with separator
     separator = tk.Frame(frame, bg="#E5E7EB", height=1)
     separator.pack(fill=tk.X, pady=(0, 15))
+    elements_to_hide.append(separator)  # Add separator to hide list
     
     buttons_frame = tk.Frame(frame, bg="#F3F4F6")
     buttons_frame.pack(pady=0)
+    elements_to_hide.append(buttons_frame)  # Add to hide list
     
     # Close window function
     def close_window():
         report_window.destroy()
-    
+
     # Transfer Settings button - only show if checkbox was ticked (gray theme)
     if show_transfer_button:
         transfer_btn = tk.Button(
@@ -1762,7 +1959,7 @@ def detect_and_update_character_display():
             ],
             "priority": 2
         },
-        "Deviantation Hero": {
+        "Deviation Hero": {
             "server": "Edream",
             "memetics": [
                 "Hydraulic Generator: One with the Tides",
