@@ -723,6 +723,9 @@ window.title("Once Human Tool Helper By Avery")
 # Hide window during loading for smoother startup
 window.withdraw()
 
+# Disable window updates during setup for faster rendering
+window.update_idletasks()
+
 bold_font = font.Font(weight="bold")
 
 # Create checkbox variable for showing costs
@@ -1645,12 +1648,12 @@ def populate_initial_cards():
     window.update_idletasks()
     scroll_canvas.configure(scrollregion=scroll_canvas.bbox("all"))
 
-# Schedule initial card population
-window.after(50, populate_initial_cards)
-
 # Initialize character system (after memetic_data is defined)
 update_character_list()
 load_character_choices()
+
+# Populate initial cards before showing window
+populate_initial_cards()
 
 # Add back button to return to Frame 1
 back_button = Button(
@@ -1696,8 +1699,11 @@ def preload_images():
                 if count >= 30:  # Preload first 30 cards
                     break
 
-# Schedule preloading after window is shown
-window.after(100, preload_images)
+# Preload images before showing window
+preload_images()
+
+# Force update to ensure everything is drawn
+window.update_idletasks()
 
 # Show window after everything is loaded
 window.deiconify()
