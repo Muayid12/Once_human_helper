@@ -1562,7 +1562,7 @@ character_display_text = tk.Text(
     borderwidth=0,
     highlightthickness=0
 )
-character_display_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+character_display_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=25)
 character_display_text.config(state=tk.DISABLED)
 
 # Optimize scrolling performance with smoother mousewheel
