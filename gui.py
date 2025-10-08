@@ -681,9 +681,9 @@ def calculate_requirements():
         # Add total cost under Watt if checkbox is checked
         if show_costs_var.get() and total_cost > 0:
             if total_cost > 20000:
-                detailed_report += f"[TOTAL]Total Cost:[/TOTAL] [COST]{total_cost:,}[/COST] [WARNING]— cannot transfer the full amount[/WARNING]\n"
+                detailed_report += f"[TOTAL]Total Transfer Cost:[/TOTAL] [COST]{total_cost:,}[/COST] [WARNING]— cannot transfer the full amount[/WARNING]\n"
             else:
-                detailed_report += f"[TOTAL]Total Cost: {total_cost:,}[/TOTAL]\n"
+                detailed_report += f"[TOTAL]Total Transfer Cost: {total_cost:,}[/TOTAL]\n"
 
         if detailed_report:
             show_formatted_report(detailed_report)
