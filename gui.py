@@ -718,7 +718,7 @@ def load_image(image_path):
 window = tk.Tk()
 window.geometry("1348x785")
 window.configure(bg="#FFFFFF")
-window.title("Once Human Tool Helper By Elucards")
+window.title("Once Human Tool Helper By Brëakdown")
 
 # Hide window during loading for smoother startup
 window.withdraw()
