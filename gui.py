@@ -258,6 +258,8 @@ def show_formatted_report(report, show_transfer_button=False, raw_data=None):
             topmost_btn.config(bg="#059669")  # Green when on top
             # Enable opacity controls
             opacity_active[0] = True
+            # Show transparency controls
+            transparency_frame.pack(side=tk.LEFT)
             # Hide header title text
             header_label.pack_forget()
             # Recenter controls now that title is hidden
@@ -276,6 +278,8 @@ def show_formatted_report(report, show_transfer_button=False, raw_data=None):
             current_opacity[0] = 1.0
             report_window.attributes('-alpha', 1.0)
             update_transparency_label()
+            # Hide transparency controls
+            transparency_frame.pack_forget()
             # Show header title text
             header_label.pack(side=tk.LEFT, padx=20, pady=20)
             # Move controls back to the right
@@ -329,7 +333,7 @@ def show_formatted_report(report, show_transfer_button=False, raw_data=None):
     
     # Transparency controls (widgets only, functions defined later)
     transparency_frame = tk.Frame(controls_frame, bg="#374151")
-    transparency_frame.pack(side=tk.LEFT)
+    # Don't pack initially - will be shown when "Always on Top" is enabled
     
     transparency_label = tk.Label(
         transparency_frame,
