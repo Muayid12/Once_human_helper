@@ -19,7 +19,6 @@ MATERIAL_COSTS = {
     'Automatic Part': 15,
     'Adhesive': 5,
     'Metal Scraps': 5,
-    'Rubbers': 5,
     'Rubber': 5,
     'Tungsten Ingot': 80,
     'Log': 1,
@@ -91,10 +90,76 @@ def show_formatted_report(report, show_transfer_button=False, raw_data=None):
         if total_watt > 0:
             detailed_report += f"Watt: {total_watt}\n"
         
-        # Add total cost
+        # Add total cost with smart character splitting
         if show_costs and total_cost > 0:
             if total_cost > 20000:
-                detailed_report += f"[TOTAL]Total Transfer Cost:[/TOTAL] [COST]{total_cost:,}[/COST] [WARNING]— cannot transfer the full amount[/WARNING]\n"
+                import math
+                
+                detailed_report += f"\n{'='*50}\n"
+                detailed_report += f"[WARNING]⚠ Total Transfer Cost: {total_cost:,} (exceeds 20,000 limit)[/WARNING]\n"
+                detailed_report += f"{'='*50}\n\n"
+                
+                # Create list of (material, amount, unit_cost, total_cost) tuples
+                material_list = []
+                for material, amount in materials_with_transfer.items():
+                    unit_cost = MATERIAL_COSTS.get(material, 0)
+                    mat_total = amount * unit_cost
+                    material_list.append({
+                        'name': material,
+                        'amount': amount,
+                        'unit_cost': unit_cost,
+                        'total_cost': mat_total
+                    })
+                
+                # Sort by total cost (descending) for better filling
+                material_list.sort(key=lambda x: x['total_cost'], reverse=True)
+                
+                # Split into characters
+                characters = []
+                current_char = {'materials': [], 'total_cost': 0}
+                
+                for mat in material_list:
+                    remaining_amount = mat['amount']
+                    
+                    while remaining_amount > 0:
+                        # Calculate how much we can fit in current character
+                        space_left = 20000 - current_char['total_cost']
+                        
+                        # Calculate max quantity that fits in remaining space
+                        max_qty = space_left // mat['unit_cost'] if mat['unit_cost'] > 0 else remaining_amount
+                        
+                        # Take the minimum of what's needed and what fits
+                        qty_to_add = min(remaining_amount, max_qty)
+                        
+                        if qty_to_add > 0:
+                            cost_to_add = qty_to_add * mat['unit_cost']
+                            current_char['materials'].append({
+                                'name': mat['name'],
+                                'amount': qty_to_add,
+                                'cost': cost_to_add
+                            })
+                            current_char['total_cost'] += cost_to_add
+                            remaining_amount -= qty_to_add
+                        
+                        # If character is full or no more room, start new character
+                        if remaining_amount > 0 or current_char['total_cost'] >= 19900:  # Leave small buffer
+                            if current_char['materials']:  # Only save if has materials
+                                characters.append(current_char)
+                            current_char = {'materials': [], 'total_cost': 0}
+                
+                # Add last character if has materials
+                if current_char['materials']:
+                    characters.append(current_char)
+                
+                # Display character assignments
+                detailed_report += f"[TOTAL]📦 Split across {len(characters)} character(s):[/TOTAL]\n\n"
+                
+                for idx, char in enumerate(characters, 1):
+                    detailed_report += f"[SECTION]Character {idx} (Total: {char['total_cost']:,}):[/SECTION]\n"
+                    for mat in char['materials']:
+                        detailed_report += f"  {mat['name']}: {mat['amount']} → [COST]{mat['cost']:,}[/COST]\n"
+                    detailed_report += "\n"
+                
             else:
                 detailed_report += f"[TOTAL]Total Transfer Cost: {total_cost:,}[/TOTAL]\n"
         
@@ -112,8 +177,19 @@ def show_formatted_report(report, show_transfer_button=False, raw_data=None):
         
         text_widget.config(state=tk.DISABLED)
         
-        # Scroll to the bottom (last position)
-        text_widget.see(tk.END)
+        # Scroll to Overall Total Requirements section
+        overall_pos = text_widget.search('Overall Total Requirements', '1.0', stopindex=tk.END)
+        
+        if overall_pos:
+            # Scroll to show the overall section
+            text_widget.see(overall_pos)
+            # Move up a bit to show some context
+            line_num = int(overall_pos.split('.')[0])
+            if line_num > 3:
+                text_widget.see(f"{line_num - 3}.0")
+        else:
+            # If not found, scroll to the bottom
+            text_widget.see(tk.END)
     
     def search_text():
         # Clear previous highlights
@@ -134,9 +210,9 @@ def show_formatted_report(report, show_transfer_button=False, raw_data=None):
 
     # Create a new Tkinter window with modern gray styling
     report_window = tk.Toplevel(window)
-    report_window.title("📊 Total Requirements Report")
+    report_window.title("Total Requirements Report")
     report_window.geometry("750x700")
-    report_window.resizable(True, True)
+    report_window.resizable(False, False)
     report_window.configure(bg="#F3F4F6")
     app_icon = load_image("appicon1.png")
     if app_icon:
@@ -273,6 +349,25 @@ def show_formatted_report(report, show_transfer_button=False, raw_data=None):
             
             # Apply color to the warning text
             text_widget.tag_add("warning_color", start_idx, end_tag_start)
+            start_idx = end_tag_start
+
+        # Apply section formatting for character splits
+        start_idx = '1.0'
+        while True:
+            start_idx = text_widget.search('[SECTION]', start_idx, stopindex=tk.END)
+            if not start_idx:
+                break
+            end_tag_start = text_widget.search('[/SECTION]', start_idx, stopindex=tk.END)
+            if not end_tag_start:
+                break
+            
+            # Remove the tags and apply color
+            text_widget.delete(start_idx, f"{start_idx}+9c")
+            end_tag_start = text_widget.search('[/SECTION]', start_idx, stopindex=tk.END)
+            text_widget.delete(end_tag_start, f"{end_tag_start}+10c")
+            
+            # Apply section header formatting
+            text_widget.tag_add("item_header", start_idx, end_tag_start)
             start_idx = end_tag_start
 
         # Apply red color formatting for quantities
@@ -668,8 +763,19 @@ def show_formatted_report(report, show_transfer_button=False, raw_data=None):
     apply_formatting()
     text_widget.config(state=tk.DISABLED)
     
-    # Scroll to the bottom (last position)
-    text_widget.see(tk.END)
+    # Scroll to Overall Total Requirements section
+    overall_pos = text_widget.search('Overall Total Requirements', '1.0', stopindex=tk.END)
+    
+    if overall_pos:
+        # Scroll to show the overall section
+        text_widget.see(overall_pos)
+        # Move up a bit to show some context
+        line_num = int(overall_pos.split('.')[0])
+        if line_num > 3:
+            text_widget.see(f"{line_num - 3}.0")
+    else:
+        # If not found, scroll to the bottom
+        text_widget.see(tk.END)
 
     # Start the Tkinter event loop
     report_window.mainloop()
@@ -726,7 +832,7 @@ class OsmosisWaterPurifier:
     ADHESIVE = 20
     ELECTRONIC_PART = 15
     METAL_SCRAPS = 15
-    RUBBERS = 10
+    RUBBER = 10
     TUNGSTEN_INGOT = 10
     WATT = 10
 
@@ -739,7 +845,7 @@ class OsmosisWaterPurifier:
             'Adhesive': self.ADHESIVE * self.quantity,
             'Electronic Part': self.ELECTRONIC_PART * self.quantity,
             'Metal Scraps': self.METAL_SCRAPS * self.quantity,
-            'Rubbers': self.RUBBERS * self.quantity,
+            'Rubber': self.RUBBER * self.quantity,
             'Tungsten Ingot': self.TUNGSTEN_INGOT * self.quantity,
             'Watt': self.WATT * self.quantity
             
@@ -782,7 +888,7 @@ class BrewingBarrel:
     LOG = 50
     ADHESIVE = 20
     ALUMINUM_INGOT = 20
-    RUBBERS = 20
+    RUBBER = 20
     ACID = 15
     WATT = 10
 
@@ -794,7 +900,7 @@ class BrewingBarrel:
             'Log': self.LOG * self.quantity,
             'Adhesive': self.ADHESIVE * self.quantity,
             'Aluminum Ingot': self.ALUMINUM_INGOT * self.quantity,
-            'Rubbers': self.RUBBERS * self.quantity,
+            'Rubber': self.RUBBER * self.quantity,
             'Acid': self.ACID * self.quantity,
             'Watt': self.WATT * self.quantity
         }
@@ -855,7 +961,7 @@ class StardustMining:
     TUNGSTEN_INGOT = 25
     ADHESIVE = 15
     STARDUST_SOURCE = 50
-    RUBBERS = 20
+    RUBBER = 20
     METAL_SCRAPS = 15
     ELECTRONIC_PART = 30
     BATTERY = 4
@@ -869,7 +975,7 @@ class StardustMining:
             'Tungsten Ingot': self.TUNGSTEN_INGOT * self.quantity,
             'Adhesive': self.ADHESIVE * self.quantity,
             'Stardust Source': self.STARDUST_SOURCE * self.quantity,
-            'Rubbers': self.RUBBERS * self.quantity,
+            'Rubber': self.RUBBER * self.quantity,
             'Metal Scraps': self.METAL_SCRAPS * self.quantity,
             'Electronic Part': self.ELECTRONIC_PART * self.quantity,
             'Battery': self.BATTERY * self.quantity,
@@ -894,7 +1000,7 @@ class BlueLight:
     LOG = 15
     ADHESIVE = 5
     ELECTRONIC_PART = 1
-    RUBBERS = 10
+    RUBBER = 10
 
     def __init__(self, quantity):
         self.quantity = quantity
@@ -904,7 +1010,7 @@ class BlueLight:
             'Log': self.LOG * self.quantity,
             'Adhesive': self.ADHESIVE * self.quantity,
             'Electronic Part': self.ELECTRONIC_PART * self.quantity,
-            'Rubbers': self.RUBBERS * self.quantity
+            'Rubber': self.RUBBER * self.quantity
         }
 
 class Radio:
@@ -1107,10 +1213,76 @@ def calculate_requirements():
         if total_watt > 0:
             detailed_report += f"Watt: {total_watt}\n"
 
-        # Add total cost under Watt if checkbox is checked
+        # Add total cost under Watt if checkbox is checked with smart character splitting
         if show_costs_var.get() and total_cost > 0:
             if total_cost > 20000:
-                detailed_report += f"[TOTAL]Total Transfer Cost:[/TOTAL] [COST]{total_cost:,}[/COST] [WARNING]— cannot transfer the full amount[/WARNING]\n"
+                import math
+                
+                detailed_report += f"\n{'='*50}\n"
+                detailed_report += f"[WARNING]⚠ Total Transfer Cost: {total_cost:,} (exceeds 20,000 limit)[/WARNING]\n"
+                detailed_report += f"{'='*50}\n\n"
+                
+                # Create list of (material, amount, unit_cost, total_cost) tuples
+                material_list = []
+                for material, amount in materials_with_transfer.items():
+                    unit_cost = MATERIAL_COSTS.get(material, 0)
+                    mat_total = amount * unit_cost
+                    material_list.append({
+                        'name': material,
+                        'amount': amount,
+                        'unit_cost': unit_cost,
+                        'total_cost': mat_total
+                    })
+                
+                # Sort by total cost (descending) for better filling
+                material_list.sort(key=lambda x: x['total_cost'], reverse=True)
+                
+                # Split into characters
+                characters = []
+                current_char = {'materials': [], 'total_cost': 0}
+                
+                for mat in material_list:
+                    remaining_amount = mat['amount']
+                    
+                    while remaining_amount > 0:
+                        # Calculate how much we can fit in current character
+                        space_left = 20000 - current_char['total_cost']
+                        
+                        # Calculate max quantity that fits in remaining space
+                        max_qty = space_left // mat['unit_cost'] if mat['unit_cost'] > 0 else remaining_amount
+                        
+                        # Take the minimum of what's needed and what fits
+                        qty_to_add = min(remaining_amount, max_qty)
+                        
+                        if qty_to_add > 0:
+                            cost_to_add = qty_to_add * mat['unit_cost']
+                            current_char['materials'].append({
+                                'name': mat['name'],
+                                'amount': qty_to_add,
+                                'cost': cost_to_add
+                            })
+                            current_char['total_cost'] += cost_to_add
+                            remaining_amount -= qty_to_add
+                        
+                        # If character is full or no more room, start new character
+                        if remaining_amount > 0 or current_char['total_cost'] >= 19900:  # Leave small buffer
+                            if current_char['materials']:  # Only save if has materials
+                                characters.append(current_char)
+                            current_char = {'materials': [], 'total_cost': 0}
+                
+                # Add last character if has materials
+                if current_char['materials']:
+                    characters.append(current_char)
+                
+                # Display character assignments
+                detailed_report += f"[TOTAL]📦 Split across {len(characters)} character(s):[/TOTAL]\n\n"
+                
+                for idx, char in enumerate(characters, 1):
+                    detailed_report += f"[SECTION]Character {idx} (Total: {char['total_cost']:,}):[/SECTION]\n"
+                    for mat in char['materials']:
+                        detailed_report += f"  {mat['name']}: {mat['amount']} → [COST]{mat['cost']:,}[/COST]\n"
+                    detailed_report += "\n"
+                
             else:
                 detailed_report += f"[TOTAL]Total Transfer Cost: {total_cost:,}[/TOTAL]\n"
 
