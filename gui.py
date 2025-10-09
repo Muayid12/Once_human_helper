@@ -1518,6 +1518,19 @@ def relative_to_assets(path):
         base_path = Path(__file__).parent
     return str(Path(base_path) / "assets" / path)
 
+def get_writable_path(filename):
+    """Return a writable path for data files (settings, characters, etc.)"""
+    if getattr(sys, 'frozen', False):
+        # When running as EXE, save to the same directory as the EXE
+        base_path = Path(sys.executable).parent
+    else:
+        # When running as script, save to assets folder
+        base_path = Path(__file__).parent / "assets"
+    
+    # Create directory if it doesn't exist
+    base_path.mkdir(parents=True, exist_ok=True)
+    return str(base_path / filename)
+
 def load_image(image_path):
     """Load an image from a path with caching."""
     try:
@@ -1529,8 +1542,8 @@ def load_image(image_path):
 
 # Function to load transfer settings from file
 def load_transfer_settings():
-    """Load transfer settings from assets/transfer_settings.txt"""
-    settings_file = relative_to_assets("transfer_settings.txt")
+    """Load transfer settings from transfer_settings.txt"""
+    settings_file = get_writable_path("transfer_settings.txt")
     try:
         if os.path.exists(settings_file):
             with open(settings_file, 'r') as f:
@@ -1547,8 +1560,8 @@ def load_transfer_settings():
 
 # Function to save transfer settings to file
 def save_transfer_settings():
-    """Save transfer settings to assets/transfer_settings.txt"""
-    settings_file = relative_to_assets("transfer_settings.txt")
+    """Save transfer settings to transfer_settings.txt"""
+    settings_file = get_writable_path("transfer_settings.txt")
     try:
         with open(settings_file, 'w') as f:
             f.write("# Transfer Cost Settings\n")
@@ -1827,7 +1840,7 @@ for x, y, img_file in additional_images:
 
 # Character data storage
 selected_memetics = {}  # {memetic_name: True/False}
-characters_file = relative_to_assets("characters.txt")
+characters_file = get_writable_path("characters.txt")
 
 def save_character_data(char_name):
     """Save character's selected memetics to file in readable format"""

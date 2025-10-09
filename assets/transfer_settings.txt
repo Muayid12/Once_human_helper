@@ -1,0 +1,28 @@
+# Transfer Cost Settings
+# Format: Material Name = true/false
+
+Acid = false
+Adhesive = false
+Aluminum Ingot = true
+Automatic Part = true
+Battery = true
+Bronze Ingot = true
+Carbon Fiber Fabric = true
+Copper Ingot = true
+Copper Ore = true
+Electronic Part = true
+Fuse = true
+Glass = true
+Gravel = true
+Log = true
+Metal Scraps = true
+Refined Part = true
+Rubber = true
+Rusted Part = true
+Shabby Fabric = true
+Special Plastic = true
+Standard Part = true
+Stardust Source = true
+Steel Ingot = true
+Tungsten Ingot = false
+Wasted Plastic = true
