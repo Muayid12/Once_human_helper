@@ -16,8 +16,8 @@ Application that helps you calculate materials for alt bases in Once Human
 
 ## Requirements
 
-1. **Python** - Only Python is needed (can be downloaded from the [Microsoft Store](https://apps.microsoft.com/detail/9nrwmjp3717k))
+  **Python** - Only Python is needed (can be downloaded from the [Microsoft Store](https://apps.microsoft.com/detail/9nrwmjp3717k))
 
 ## How to Use
 
-Simply run `install_and_build.bat` - it will install all the needed dependencies except Python, which you should install manually first.
+Simply run `install_and_build.bat` - it will install all the needed dependencies except Python (which you should install manually first) and generate an executable file called `OnceHumanHelper.exe`.
