@@ -23,6 +23,7 @@ Application that helps you calculate materials for alt bases in Once Human
 
 Simply run `install_and_build.bat` - it will install all the needed dependencies except Python (which you should install manually first) and generate an executable file called `OnceHumanHelper.exe`.
 
+## Demo
 
 ![Screenshot 2](https://i.imgur.com/Xs9Rvzq.png)
 
