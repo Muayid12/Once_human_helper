@@ -6,6 +6,7 @@ Application that helps you calculate materials for alt bases in Once Human
 
 ![Alt Base Materials Calculator](https://i.imgur.com/YToFgZV.png)
 
+
 ## Features
 
 1. **Calculate Materials Needed for Each Facility** - Get precise material requirements for every facility for your Alt Base
@@ -21,3 +22,10 @@ Application that helps you calculate materials for alt bases in Once Human
 ## How to Use
 
 Simply run `install_and_build.bat` - it will install all the needed dependencies except Python (which you should install manually first) and generate an executable file called `OnceHumanHelper.exe`.
+
+
+![Screenshot 2](https://i.imgur.com/Xs9Rvzq.png)
+
+![Screenshot 3](https://i.imgur.com/s9M1nwW.png)
+
+![Screenshot 4](https://i.imgur.com/hAtlYsH.png)
